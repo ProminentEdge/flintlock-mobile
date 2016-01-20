@@ -38,7 +38,21 @@
       "locator": "https://github.com/EddyVerbruggen/Toast-PhoneGap-Plugin.git",
       "id": "cordova-plugin-x-toast"
     },
-    "cordova-plugin-file"
+    "cordova-plugin-file",
+    {
+      "locator": "https://github.com/brodysoft/Cordova-SQLitePlugin.git",
+      "id": "cordova-sqlite-storage"
+    },
+    {
+      "locator": "https://github.com/an-rahulpandey/cordova-plugin-dbcopy.git",
+      "id": "me.rahul.plugins.sqlDB"
+    },
+    {
+      "locator": "https://github.com/pbernasconi/cordova-progressIndicator.git",
+      "id": "org.pbernasconi.progressindicator"
+    },
+    "cordova-plugin-geolocation",
+    "cordova-plugin-inappbrowser"
   ],
   "cordovaPlatforms": [
     "android",

@@ -47,3 +47,6 @@ ionic plugin add https://github.com/EddyVerbruggen/Toast-PhoneGap-Plugin.git
 ionic plugin add https://github.com/brodysoft/Cordova-SQLitePlugin.git
 ionic plugin add https://github.com/an-rahulpandey/cordova-plugin-dbcopy.git
 ionic plugin add https://github.com/pbernasconi/cordova-progressIndicator.git
+ionic plugin add cordova-plugin-geolocation
+ionic plugin add cordova-plugin-inappbrowser
+

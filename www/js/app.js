@@ -8,7 +8,7 @@
 // 'vida.services' is found in services.js
 var db = null;
 angular.module('vida', ['ionic', 'ngCordova', 'vida.directives', 'vida.controllers', 'vida.services', 'leaflet-directive',
-    'pascalprecht.translate', 'vida-translations-en', 'vida-translations-es', 'ngResource'])
+    'pascalprecht.translate', 'vida-translations-en', 'vida-translations-es', 'ngResource', 'angularMoment'])
 
 .run(function($ionicPlatform, $window, $cordovaSQLite, networkService, optionService) {
   $ionicPlatform.ready(function() {
@@ -221,10 +221,20 @@ angular.module('vida', ['ionic', 'ngCordova', 'vida.directives', 'vida.controlle
         controller: 'SettingsCtrl'
       }
     }
+  })
+
+  .state('vida.tracking', {
+    url: '/tracking',
+    views: {
+      'view-tracking': {
+        templateUrl: 'views/tracking.html',
+        controller: 'TrackingCtrl'
+      }
+    }
   });
 
   // if none of the above states are matched, use this as the fallback
-  $urlRouterProvider.otherwise('/vida/person-search');
+  $urlRouterProvider.otherwise('/vida/tracking');
 })
 
 .config(['$translateProvider', function ($translateProvider) {

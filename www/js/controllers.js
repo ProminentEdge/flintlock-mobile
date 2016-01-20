@@ -880,8 +880,8 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
 })
 
 .controller('SettingsCtrl', function($scope, $location, peopleService, optionService, VIDA_localDB,
-                                     networkService, $translate){
-  console.log('---------------------------------- SettingsCtrl');
+                                     networkService, $translate, $cordovaGeolocation, $cordovaOauth, $http){
+    console.log('---------------------------------- SettingsCtrl');
 
     $scope.networkAddr = networkService.getServerAddress();
 
@@ -890,6 +890,47 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
       // Can go directly to '/login'
       $location.path(url);
     };
+
+    $scope.testOauth = function() {
+      // Can go directly to '/login'
+      console.log('---[ testOauth: ');
+
+      $cordovaOauth.google("870172265350-qpj5qtn1vddqqkqpbsjhseifehb4j9g3.apps.googleusercontent.com", ["email"]).then(function(result) {
+        console.log("Response Object -> " + JSON.stringify(result));
+      }, function(error) {
+        console.log("Error -> " + error);
+      });
+    };
+
+    // Functions
+    $scope.testGps = function() {
+      console.log('---[ test gps ');
+      var posOptions = {timeout: 10000, enableHighAccuracy: false};
+      $cordovaGeolocation.getCurrentPosition(posOptions).then(function (position) {
+        var lat  = position.coords.latitude;
+        var long = position.coords.longitude;
+        console.log('---[ test gps (lat, long): ', lat, long);
+
+        console.log('---[ chk1 ');
+        var payload = {"entity_type": 1, "force_type": 1, "geom": "SRID=4326;POINT (50.0000000000000000 30.0000000000000000)", "user": "mobile"};
+        console.log('---[ chk2 ');
+
+        $http.post('http://192.168.33.15/api/v1/track/', payload, {
+          headers: {
+            'Authorization': 'Basic ' + btoa('admin:admin')
+          }
+        }).success(function() {
+          console.log('----[ testGps.posted');
+        }).error(function(err) {
+          // can be moved to callFailure(err)
+          console.log('----[ testGps.failed: ', err);
+        });
+      }, function(err) {
+        // error
+        console.log('---[ test gps, err:'+ err);
+      });
+    };
+
 
     $scope.saveServerIP = function(IP) {
       networkService.setServerAddress(IP);
@@ -964,6 +1005,70 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
       VIDA_localDB.queryDB_update('configuration', JSONObject);
     };
 })
+
+.controller('TrackingCtrl', function($scope, $location, peopleService, optionService, VIDA_localDB,
+                                       networkService, $translate, $cordovaGeolocation, $cordovaOauth, $http,
+                                       $interval){
+    console.log('---------------------------------- TrackingCtrl');
+
+    $scope.networkAddr = networkService.getServerAddress();
+    $scope.tracking = false;
+    $scope.trackingInterval = null;
+    $scope.lastSuccess = new Date(); //TODO: null
+
+    $scope.trackingChanged = function() {
+      if ($scope.tracking === false) {
+        $scope.tracking = true;
+        $scope.trackingStart();
+      } else {
+        $scope.tracking = false;
+        $scope.trackingStop();
+      }
+      console.log('tracking: ', $scope.tracking);
+    };
+
+    $scope.trackingStart = function() {
+      if ( $scope.trackingInterval !== null ) return;
+      $scope.trackingInterval = $interval($scope.testGps, 1000);
+    };
+
+    $scope.trackingStop = function() {
+      if ($scope.trackingInterval !== null) {
+        $interval.cancel($scope.trackingInterval);
+        $scope.trackingInterval = null;
+      }
+    };
+
+    // Functions
+    $scope.testGps = function() {
+      console.log('---[ test gps ');
+      var posOptions = {timeout: 10000, enableHighAccuracy: false};
+      $cordovaGeolocation.getCurrentPosition(posOptions).then(function (position) {
+        var lat  = position.coords.latitude;
+        var long = position.coords.longitude;
+        console.log('---[ test gps (lat, long): ', lat, long);
+
+        console.log('---[ chk1 ');
+        var payload = {"entity_type": 1, "force_type": 1, "geom": "SRID=4326;POINT (50.0000000000000000 30.0000000000000000)", "user": "mobile"};
+        console.log('---[ chk2 ');
+
+        $http.post('http://192.168.33.15/api/v1/track/', payload, {
+          headers: {
+            'Authorization': 'Basic ' + btoa('admin:admin')
+          }
+        }).success(function() {
+          console.log('----[ testGps.posted');
+          $scope.lastSuccess = new Date();
+        }).error(function(err) {
+          // can be moved to callFailure(err)
+          console.log('----[ testGps.failed: ', err);
+        });
+      }, function(err) {
+        // error
+        console.log('---[ test gps, err:', err);
+      });
+    };
+  })
 
 .controller('loginCtrl', function($scope, $location, $http, networkService, $filter, $cordovaToast, VIDA_localDB){
   console.log('---------------------------------- loginCtrl');

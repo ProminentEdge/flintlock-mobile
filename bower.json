@@ -10,6 +10,9 @@
     "leaflet": "~0.7.3",
     "ngCordova": "~0.1.20-alpha",
     "angular-translate": "2.8.1",
-    "angular-resource": "1.4.3"
+    "angular-resource": "1.4.3",
+    "ng-cordova-oauth": "~0.2.2",
+    "angular-moment": "~0.10.3",
+    "moment": "~2.11.1"
   }
 }

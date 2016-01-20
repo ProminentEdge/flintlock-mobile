@@ -1,0 +1,15 @@
+<ion-view title="{{'title_tracking' | translate}}">
+  <ion-pane>
+    <ion-content padding="true" class="has-header">
+      <form>
+        <ion-toggle ng-model="tracking" ng-change="trackingChanged()" toggle-class="toggle-positive">{{'tracking' | translate}}</ion-toggle>
+        <label class="item item-input">
+          <span class="input-label">{{'Last Success'}}</span>
+          <span class="input-label" am-time-ago="lastSuccess"></span>
+        </label>
+
+        <button class="button button-positive button-block" ng-click="testGps()">{{'GPS Test'}}</button>
+      </form>
+    </ion-content>
+  </ion-pane>
+</ion-view>
