@@ -884,6 +884,7 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
     console.log('---------------------------------- SettingsCtrl');
 
     $scope.networkAddr = networkService.getServerAddress();
+    $scope.networkService = networkService;
 
     // Functions
     $scope.logout = function(url) {
@@ -1035,23 +1036,23 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
   })
 
 .controller('loginCtrl', function($scope, $location, $http, networkService, $filter, $cordovaToast, VIDA_localDB,
-                                  loginService){
+                                  loginService, $cordovaProgress){
   console.log('---------------------------------- loginCtrl');
-  $scope.loginRequest = 0;
   $scope.credentials = {};
 
   $scope.login = function(url) {
     // Request authorization
     if (($scope.credentials.username) && ($scope.credentials.password)) {
-      $scope.loginRequest++;
+      $cordovaProgress.showSimpleWithLabelDetail(true, "Logging in", "Verifying Credentials");
+
       loginService.login($scope.credentials.username, $scope.credentials.password).then(
         function(){
           $location.path(url);
           VIDA_localDB.queryDB_update_settings();
-          $scope.loginRequest--;
+          $cordovaProgress.hide();
         },
         function(){
-          $scope.loginRequest--;
+          $cordovaProgress.hide();
         }
       );
     } else {

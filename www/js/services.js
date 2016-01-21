@@ -10,11 +10,21 @@ function dataURLtoBlob(dataURI) {
 
 angular.module('vida.services', ['ngCordova', 'ngResource'])
 
+
 .factory('httpRequestInterceptor', function(networkService) {
    return {
       request: function (config) {
-        config.headers.Authorization = networkService.getBasicAuthentication();
-        config.timeout = 45000;
+        // if request doesn't have authorization header already, add basic auth
+        if (typeof config.headers.Authorization === 'undefined') {
+          config.headers.Authorization = networkService.getBasicAuthentication();
+        }
+
+        // set max timeout since if creds are not valid for endpoint with basic auth, it will go for 90 secs or whatever
+        // the large default is.
+        if (typeof config.timeout === 'undefined') {
+          config.timeout = 10000;
+        }
+
         return config;
       }
     };
@@ -26,29 +36,12 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
 
   //$httpProvider.defaults.xsrfCookieName = 'csrftoken';
   //$httpProvider.defaults.xsrfHeaderName = 'X-CSRFToken';
-  $httpProvider.interceptors.push('httpRequestInterceptor');
-  $httpProvider.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
+  //$httpProvider.interceptors.push('httpRequestInterceptor');
+  //$httpProvider.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
   //$httpProvider.defaults.headers.common['X-Auth-Token'] = undefined;
 
   $resourceProvider.defaults.stripTrailingSlashes = false;
 })
-
-/*.provider('configService', function() {
-  var service_ = null;
-  this.configuration = {};
-  this.$get = function($window, $http, $location, $translate) {
-    service_ = this;
-    this.username = 'admin';
-    this.password = 'admin';
-    //this.csrfToken = $cookies.csrftoken;
-    //$translate.use(this.currentLanguage);
-    return this;
-  };
-
-  this.isAuthenticated = function() {
-    return service_.authStatus == 200;
-  };
-})*/
 
 .factory('Camera', ['$q', function($q){
   return {
@@ -196,7 +189,7 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
     $http.post(uploadUrl, JSONPerson, {
       transformRequest: angular.identity,
       headers: {
-        'Authorization': 'Basic ' + btoa('admin:admin')
+        'Authorization': networkService.getAuthenticationHeader().headers.Authorization
       }
     }).success(function() {
       callSuccess();
@@ -287,29 +280,89 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
   };
 })
 
-.service('loginService', function($http, $q, networkService) {
+.service('loginService', function($http, $q, networkService, $cordovaToast, $filter) {
   this.login = function (username, password) {
     var deferred = $q.defer();
     networkService.setAuthentication(username, password);
-    $http.get(networkService.getAuthenticationURL(), networkService.getAuthenticationHeader()).then(
-      function(xhr) {
-        if (xhr.status === 200) {
+    $http.get(networkService.getAuthenticationURL(),
+      {
+        "headers": {
+          "Content-Type": '',
+          "Authorization": networkService.getBasicAuthentication()
+        },
+        "timeout": 3000
+      }).then(
+      function(result) {
+        console.log('------ login success: ', result);
+        if (result.status === 200) {
           deferred.resolve();
         } else {
-          deferred.reject(xhr);
+          deferred.reject(result);
         }
       }, function(error) {
+        console.log('------ login error: ', error);
         if (error) {
-          if (error.status === 401) {
-            $cordovaToast.showShortBottom(($filter('translate')('error_wrong_credentials')));
+          // Note: 401 will NOT occure when endpoint is basic auth and invalid creds are used. That's when basic auth
+          //       dialog is supposed to come up which does not on mobile browser so the request stays active until
+          //       timeout is reached. this is why we are using a short timeout for this request and catching status 0
+          //       assuming that it is the bad credentials.
+          if (error.status === 401 || error.status === 0) {
+            $cordovaToast.showShortBottom(($filter('translate')('error_invalid_credentials')));
+          } else if (error.status === 404) {
+            $cordovaToast.showShortBottom(($filter('translate')('error_server_not_found')));
           } else {
-            $cordovaToast.showShortBottom($filter('translate')('error_connecting_server') + error.status + ": " + error.description);
+            $cordovaToast.showShortBottom($filter('translate')('error_connecting_server') + ', '
+              + error.status + ": " + error.description);
           }
         } else {
           $cordovaToast.showShortBottom($filter('translate')('error_connecting_server'));
         }
         deferred.reject();
       });
+    return deferred.promise;
+  };
+
+  this.loginAjax = function (username, password) {
+    var deferred = $q.defer();
+    networkService.setAuthentication(username, password);
+
+    $.ajax({
+      type: 'GET',
+      url: networkService.getAuthenticationURL(),
+
+      // ****************        syncronous call!        *****************
+      // with basic auth, when the credentials are wrong, the app doesn't get a 401 as the 'browser'/webview is supposed
+      // to popup the basic auth dialog for user to retry which doesn't work on mobile. This means the request attempt
+      // stays active until the timeout duration is hit at which point you still dont see the 401 and just a timeout.
+      // when call is NOT async, you get the 401. The app will 'hang' for a bit of course...
+      async: false,
+      timeout: 3000,
+
+      "headers": {
+        "Content-Type": '',
+        "Authorization": networkService.getBasicAuthentication()
+      }
+    }).done(function(data, textStatus, xhr) {
+      console.log('----[ ajax.done: ', xhr);
+      if (xhr.status === 200) {
+        deferred.resolve(data);
+      } else {
+        deferred.reject(xhr);
+      }
+    }).fail(function(xhr, textStatus, errorThrown) {
+      console.log('----[ ajax.fail: ', xhr);
+      if (xhr.status === 404) {
+        $cordovaToast.showShortBottom(($filter('translate')('error_server_not_found')));
+      } else if (xhr.status === 401) {
+        $cordovaToast.showShortBottom(($filter('translate')('error_wrong_credentials')));
+      } else {
+        $cordovaToast.showShortBottom($filter('translate')('error_connecting_server'));
+      }
+      deferred.reject(xhr);
+    }).always(function(a, status, c) {
+      console.log('----[ ajax.always: ', c);
+    });
+
     return deferred.promise;
   };
 })
@@ -325,6 +378,9 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
     var form = $resource(networkService.getFormURL() + ':id', {}, {
       query: {
         method: 'GET',
+        headers: {
+          "Authorization": networkService.getBasicAuthentication()
+        },
         isArray: true,
         transformResponse: $http.defaults.transformResponse.concat([
           function (data, headersGetter) {
@@ -785,17 +841,22 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
     this.configuration.protocol = default_config.configuration.protocol;
     this.configuration.language = default_config.configuration.language;
     this.configuration.workOffline = (default_config.configuration.workOffline === 'true');
-
-    var URL = this.configuration.protocol + '://' + this.configuration.serverURL + '/api/v1';
     this.configuration.api = {};
-    this.configuration.api.trackURL = URL + '/track/';
-    this.configuration.api.formURL = URL + '/form/';
-    this.configuration.api.reportURL = URL + '/report/';
-    this.configuration.api.personURL = URL + '/person/';
-    this.configuration.api.searchURL = URL + '/person/?custom_query=';
-    this.configuration.api.fileServiceURL = URL + '/fileservice/';
-    this.configuration.api.shelterURL = URL + '/shelter/';
-    this.configuration.api.faceSearchURL = URL + '/facesearchservice/';
+
+
+    this.compute_API_URLs = function() {
+      var URL = this.configuration.protocol + '://' + this.configuration.serverURL + '/api/v1';
+      this.configuration.api.trackURL = URL + '/track/';
+      this.configuration.api.formURL = URL + '/form/';
+      this.configuration.api.reportURL = URL + '/report/';
+      this.configuration.api.personURL = URL + '/person/';
+      this.configuration.api.searchURL = URL + '/person/?custom_query=';
+      this.configuration.api.fileServiceURL = URL + '/fileservice/';
+      this.configuration.api.shelterURL = URL + '/shelter/';
+      this.configuration.api.faceSearchURL = URL + '/facesearchservice/';
+    };
+
+    this.compute_API_URLs();
 
     this.SetConfigurationFromDB = function(DBSettings) {
       // Set DB settings
@@ -821,18 +882,7 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
 
     this.setServerAddress = function(Addr) {
       this.configuration.serverURL = Addr;
-
-      var URL = this.configuration.protocol + '://' + Addr + '/api/v1';
-      // Need to reset variables
-      //TODO: this has to change. we are computing the same exact urls two places. Do not store, concant on get instead
-      this.configuration.api.trackURL = URL + '/track/';
-      this.configuration.api.formURL = URL + '/form/';
-      this.configuration.api.reportURL = URL + '/report/';
-      this.configuration.api.personURL = URL + '/person/';
-      this.configuration.api.searchURL = URL + '/person/?custom_query=';
-      this.configuration.api.fileServiceURL = URL + '/fileservice/';
-      this.configuration.api.shelterURL = URL + '/shelter/';
-      this.configuration.api.faceSearchURL = URL + '/facesearchservice/';
+      this.compute_API_URLs();
     };
 
     this.getBasicAuthentication = function() {
@@ -841,16 +891,11 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
     };
 
     this.getAuthenticationHeader = function() {
-      var authentication = btoa(this.configuration.username + ':' + this.configuration.password);
-      var authen = {};
-      authen.headers = {};
-      if (authentication !== null) {
-        authen.headers.Authorization = 'Basic ' + authentication;
-      } else {
-        authen.headers.Authorization = '';
-      }
-
-      return authen;
+      return {
+        "headers": {
+          "Authorization": self.getBasicAuthentication()
+        }
+      };
     };
 
     this.setAuthentication = function(username, password){

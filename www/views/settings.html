@@ -17,7 +17,16 @@
           </select>
         </label>
 
-        <button class="button button-positive button-block" ng-click="logout('/login')">{{'button_logout' | translate}}</button>
+        <div class="spacer" style="width: 300px; height: 40px;"></div>
+
+        <label class="item item-input">
+          <span class="input-label">Username </span>
+          <input type="text" ng-disabled="true" ng-model="networkService.configuration.username">
+        </label>
+        <button class="button button-positive button-block" ng-click="logout('/login')">{{'button_change_credentials' | translate}}</button>
+
+        <div class="spacer" style="width: 300px; height: 40px;"></div>
+
         <button class="button button-positive button-block" ng-click="testOauth()">{{'Test OAuth'}}</button>
       </form>
     </ion-content>
