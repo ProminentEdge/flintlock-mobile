@@ -1,5 +1,8 @@
 (function() {
   var translations = {
+    'title_tracking': 'Tracking',
+    'title_report_create': 'Create Report',
+    'title_Website': 'Website',
     'title_search': 'Search',
     'title_create': 'Create Person',
     'title_edit': 'Edit Person',
@@ -7,7 +10,6 @@
     'title_shelters': 'Shelters',
     'title_shelter_details': 'Shelter Details',
     'title_settings': 'Settings',
-    'title_tracking': 'Tracking',
     'title_login': 'VIDA Login',
     'title_picture_dialog': 'Picture',
     'login_username': 'Username',
@@ -29,8 +31,10 @@
     'modal_picture_choose_from_library': 'Choose From Library',
     'modal_picture_remove_picture': 'Remove Picture',
     'modal_cancel': 'Cancel',
-    'tab_search': 'Search',
     'tab_tracking': 'Tracking',
+    'tab_report_create': 'Report',
+    'tab_website': 'Website',
+    'tab_search': 'Search',
     'tab_create': 'Create',
     'tab_shelter': 'Shelter',
     'tab_settings': 'Settings',

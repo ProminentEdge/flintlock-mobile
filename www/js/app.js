@@ -138,6 +138,56 @@ angular.module('vida', ['ionic', 'ngCordova', 'vida.directives', 'vida.controlle
   // Each tab has its own nav history stack:
 
 
+  .state('vida.tracking', {
+    url: '/tracking',
+    views: {
+      'view-tracking': {
+        templateUrl: 'views/tracking.html',
+        controller: 'TrackingCtrl'
+      }
+    }
+  })
+
+  .state('vida.report-create', {
+    url: '/report-create',
+    views: {
+      'view-report-create': {
+        templateUrl: 'views/report-create.html',
+        controller: 'ReportCreateCtrl'
+      }
+    }
+  })
+
+  .state('vida.report-create.report-detail', {
+    url: '/report-detail/:reportId',
+    views: {
+      'view-report-create@vida': {
+        templateUrl: 'views/report-detail.html',
+        controller: 'ReportDetailCtrl'
+      }
+    }
+  })
+
+  .state('vida.settings', {
+    url: '/settings',
+    views: {
+      'view-settings': {
+        templateUrl: 'views/settings.html',
+        controller: 'SettingsCtrl'
+      }
+    }
+  })
+
+  .state('vida.website', {
+    url: '/website',
+    views: {
+      'view-website': {
+        templateUrl: 'views/website.html',
+        controller: 'WebsiteCtrl'
+      }
+    }
+  })
+
   .state('vida.person-create', {
     url: '/person-create',
     views: {
@@ -209,26 +259,6 @@ angular.module('vida', ['ionic', 'ngCordova', 'vida.directives', 'vida.controlle
       'view-shelter-search@vida': {
         templateUrl: 'views/shelter-detail.html',
         controller: 'ShelterDetailCtrl'
-      }
-    }
-  })
-
-  .state('vida.settings', {
-    url: '/settings',
-    views: {
-      'view-settings': {
-        templateUrl: 'views/settings.html',
-        controller: 'SettingsCtrl'
-      }
-    }
-  })
-
-  .state('vida.tracking', {
-    url: '/tracking',
-    views: {
-      'view-tracking': {
-        templateUrl: 'views/tracking.html',
-        controller: 'TrackingCtrl'
       }
     }
   });

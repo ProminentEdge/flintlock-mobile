@@ -128,176 +128,127 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
   };
 })
 
-.factory('geofenceService', function ($rootScope, $window, $q, $log, $ionicLoading, toaster) {
-  $window.geofence = $window.geofence || {
-    addOrUpdate: function (fences) {
-      var deffered = $q.defer();
-      $log.log('Mocked geofence plugin addOrUpdate', fences);
-      deffered.resolve();
-      return deffered.promise;
-    },
-    remove: function (ids) {
-      var deffered = $q.defer();
-      $log.log('Mocked geofence plugin remove', ids);
-      deffered.resolve();
-      return deffered.promise;
-    },
-    removeAll: function () {
-      var deffered = $q.defer();
-      $log.log('Mocked geofence plugin removeAll');
-      deffered.resolve();
-      return deffered.promise;
-    },
-    receiveTransition: function (obj) {
-      $rootScope.$apply(function () {
-        toaster.pop('info', 'title', 'text');
-      });
-    }
-  };
-  $window.TransitionType = $window.TransitionType || {
-    ENTER: 1,
-    EXIT: 2,
-    BOTH: 3
-  };
-
-  var geofenceService = {
-    _geofences: [],
-    _geofencesPromise: null,
-    createdGeofenceDraft: null,
-    loadFromLocalStorage: function () {
-      var result = localStorage.geofences;
-      var geofences = [];
-      if (result) {
-        try {
-          geofences = angular.fromJson(result);
-        } catch (ex) {
-
-        }
-      }
-      this._geofences = geofences;
-      return $q.when(this._geofences);
-    },
-    saveToLocalStorage: function () {
-      localStorage.geofences = angular.toJson(this._geofences);
-    },
-    loadFromDevice: function () {
-      var self = this;
-      if ($window.geofence && $window.geofence.getWatched) {
-        return $window.geofence.getWatched().then(function (geofencesJson) {
-          self._geofences = angular.fromJson(geofencesJson);
-          return self._geofences;
-        });
-      }
-      return this.loadFromLocalStorage();
-    },
-    getAll: function () {
-      var self = this;
-      if (!self._geofencesPromise) {
-        self._geofencesPromise = $q.defer();
-        self.loadFromDevice().then(function (geofences) {
-          self._geofences = geofences;
-          self._geofencesPromise.resolve(geofences);
-        }, function (reason) {
-          $log.log("Error fetching geofences", reason);
-          self._geofencesPromise.reject(reason);
-        });
-      }
-      return self._geofencesPromise.promise;
-    },
-    addOrUpdate: function (geofence) {
-      var self = this;
-      $window.geofence.addOrUpdate(geofence).then(function () {
-        if ((self.createdGeofenceDraft && self.createdGeofenceDraft === geofence) ||
-          !self.findById(geofence.id)) {
-          self._geofences.push(geofence);
-          self.saveToLocalStorage();
-        }
-
-        if (self.createdGeofenceDraft) {
-          self.createdGeofenceDraft = null;
-        }
-      });
-
-    },
-    findById: function (id) {
-      if (this.createdGeofenceDraft && this.createdGeofenceDraft.id === id) {
-        return this.createdGeofenceDraft;
-      }
-      var geoFences = this._geofences.filter(function (g) {
-        return g.id === id;
-      });
-      if (geoFences.length > 0) {
-        return geoFences[0];
-      }
-      return undefined;
-    },
-    remove: function (geofence) {
-      var self = this;
-      $ionicLoading.show({
-        template: 'Removing geofence...'
-      });
-      $window.geofence.remove(geofence.id).then(function () {
-        $ionicLoading.hide();
-        self._geofences.splice(self._geofences.indexOf(geofence), 1);
-        self.saveToLocalStorage();
-      }, function (reason) {
-        $log.log('Error while removing geofence', reason);
-        $ionicLoading.show({
-          template: 'Error',
-          duration: 1500
-        });
-      });
-    },
-    removeAll: function () {
-      var self = this;
-      $ionicLoading.show({
-        template: 'Removing all geofences...'
-      });
-      $window.geofence.removeAll().then(function () {
-        $ionicLoading.hide();
-        self._geofences.length = 0;
-        self.saveToLocalStorage();
-      }, function (reason) {
-        $log.log('Error while removing all geofences', reason);
-        $ionicLoading.show({
-          template: 'Error',
-          duration: 1500
-        });
-      });
-    },
-    getNextNotificationId: function () {
-      var max = 0;
-      this._geofences.forEach(function (gf) {
-        if (gf.notification && gf.notification.id) {
-          if (gf.notification.id > max) {
-            max = gf.notification.id;
-          }
-        }
-      });
-      return max + 1;
-    }
-  };
-
-  return geofenceService;
-})
-
 .factory('geolocationService', function ($q, $timeout) {
+  // if call has been made in the past 1 second, don't hit the api
   var currentPositionCache;
+
   return {
     getCurrentPosition: function () {
       if (!currentPositionCache) {
-        var deffered = $q.defer();
+        var deferred = $q.defer();
         navigator.geolocation.getCurrentPosition(function (position) {
-          deffered.resolve(currentPositionCache = position);
+          currentPositionCache = position;
+          deferred.resolve(currentPositionCache);
           $timeout(function () {
             currentPositionCache = undefined;
-          }, 10000);
+          }, 1000);
         }, function () {
-          deffered.reject();
+          deferred.reject();
+        },
+        {
+          maximumAge: 8000,
+          timeout: 10000,
+          enableHighAccuracy: true
         });
-        return deffered.promise;
+        return deferred.promise;
       }
       return $q.when(currentPositionCache);
+    }
+  };
+})
+
+
+.service('trackerService', function($http, $q, networkService) {
+  this.post = function (position) {
+    var deferred = $q.defer();
+
+    var payload = {
+      "entity_type": 1,
+      "force_type": 1,
+      "geom": "SRID=4326;POINT (" + position.coords.longitude + " " + position.coords.latitude + ")",
+      "user": "mobile"
+    };
+
+    $http.post(networkService.getTrackURL(), payload, networkService.getAuthenticationHeader()).success(function(data) {
+      console.log('----[ trackerService.success: ', data);
+      deferred.resolve();
+    }).error(function(error) {
+      console.log('----[ trackerService.error: ', error);
+      deferred.reject(error);
+    });
+
+    return deferred.promise;
+  };
+})
+
+.service('loginService', function($http, $q, networkService) {
+  this.login = function (username, password) {
+    var deferred = $q.defer();
+    networkService.setAuthentication(username, password);
+    $http.get(networkService.getAuthenticationURL(), networkService.getAuthenticationHeader()).then(
+      function(xhr) {
+        if (xhr.status === 200) {
+          deferred.resolve();
+        } else {
+          deferred.reject(xhr);
+          alert(xhr.status);
+        }
+      }, function(error) {
+        if (error) {
+          if (error.status === 401) {
+            deferred.reject(xhr);
+            $cordovaToast.showShortBottom(($filter('translate')('error_wrong_credentials')));
+          } else {
+            alert($filter('translate')('error_connecting_server') + error.status + ": " + error.description);
+          }
+        }
+      });
+    return deferred.promise;
+  };
+})
+
+.service('formService', function($http, networkService, $resource, $q) {
+  var service = this;
+  var forms = [];
+  var current_form = {};
+  current_form.str = 'None';
+  current_form.link = 'None';
+
+  this.getAll = function() {
+    var form = $resource(networkService.getFormURL() + ':id', {}, {
+      query: {
+        method: 'GET',
+        isArray: true,
+        transformResponse: $http.defaults.transformResponse.concat([
+          function (data, headersGetter) {
+            forms = data.objects;
+            return data.objects;
+          }
+        ])
+      }
+    });
+
+    return form.query().$promise;
+  };
+
+  this.getById = function(id) {
+    for(var i = 0; i < forms.length; i++) {
+      if (forms[i].id == id)
+        return forms[i];
+    }
+  };
+
+  this.getCurrentForm = function() {
+    return current_form;
+  };
+
+  this.setCurrentForm = function(form){
+    if (form !== 'None') {
+      current_form.str = form.name;
+      current_form.link = '#/vida/form-detail/' + form.id;
+    } else {
+      current_form.str = 'None';
+      current_form.link = 'None';
     }
   };
 })
@@ -730,6 +681,9 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
 
     var URL = this.configuration.protocol + '://' + this.configuration.serverURL + '/api/v1';
     this.configuration.api = {};
+    this.configuration.api.trackURL = URL + '/track/';
+    this.configuration.api.formURL = URL + '/form/';
+    this.configuration.api.reportURL = URL + '/report/';
     this.configuration.api.personURL = URL + '/person/';
     this.configuration.api.searchURL = URL + '/person/?custom_query=';
     this.configuration.api.fileServiceURL = URL + '/fileservice/';
@@ -763,6 +717,10 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
 
       var URL = this.configuration.protocol + '://' + Addr + '/api/v1';
       // Need to reset variables
+      //TODO: this has to change. we are computing the same exact urls two places. Do not store, concant on get instead
+      this.configuration.api.trackURL = URL + '/track/';
+      this.configuration.api.formURL = URL + '/form/';
+      this.configuration.api.reportURL = URL + '/report/';
       this.configuration.api.personURL = URL + '/person/';
       this.configuration.api.searchURL = URL + '/person/?custom_query=';
       this.configuration.api.fileServiceURL = URL + '/fileservice/';
@@ -804,6 +762,18 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
     // todo: get rid of this usage
     this.getAuthentication = function(){
       return this.configuration;
+    };
+
+    this.getTrackURL = function() {
+      return this.configuration.api.trackURL;
+    };
+
+    this.getFormURL = function() {
+      return this.configuration.api.formURL;
+    };
+
+    this.getReportURL = function() {
+      return this.configuration.api.reportURL;
     };
 
     this.getPeopleURL = function() {

@@ -880,7 +880,7 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
 })
 
 .controller('SettingsCtrl', function($scope, $location, peopleService, optionService, VIDA_localDB,
-                                     networkService, $translate, $cordovaGeolocation, $cordovaOauth, $http){
+                                     networkService, $translate, $cordovaOauth){
     console.log('---------------------------------- SettingsCtrl');
 
     $scope.networkAddr = networkService.getServerAddress();
@@ -901,36 +901,6 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
         console.log("Error -> " + error);
       });
     };
-
-    // Functions
-    $scope.testGps = function() {
-      console.log('---[ test gps ');
-      var posOptions = {timeout: 10000, enableHighAccuracy: false};
-      $cordovaGeolocation.getCurrentPosition(posOptions).then(function (position) {
-        var lat  = position.coords.latitude;
-        var long = position.coords.longitude;
-        console.log('---[ test gps (lat, long): ', lat, long);
-
-        console.log('---[ chk1 ');
-        var payload = {"entity_type": 1, "force_type": 1, "geom": "SRID=4326;POINT (50.0000000000000000 30.0000000000000000)", "user": "mobile"};
-        console.log('---[ chk2 ');
-
-        $http.post('http://192.168.33.15/api/v1/track/', payload, {
-          headers: {
-            'Authorization': 'Basic ' + btoa('admin:admin')
-          }
-        }).success(function() {
-          console.log('----[ testGps.posted');
-        }).error(function(err) {
-          // can be moved to callFailure(err)
-          console.log('----[ testGps.failed: ', err);
-        });
-      }, function(err) {
-        // error
-        console.log('---[ test gps, err:'+ err);
-      });
-    };
-
 
     $scope.saveServerIP = function(IP) {
       networkService.setServerAddress(IP);
@@ -1006,15 +976,14 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
     };
 })
 
-.controller('TrackingCtrl', function($scope, $location, peopleService, optionService, VIDA_localDB,
-                                       networkService, $translate, $cordovaGeolocation, $cordovaOauth, $http,
-                                       $interval){
+.controller('TrackingCtrl', function($scope, $location, optionService, VIDA_localDB,
+                                     networkService, $translate, $interval, geolocationService, trackerService,
+                                     $ionicLoading){
     console.log('---------------------------------- TrackingCtrl');
-
-    $scope.networkAddr = networkService.getServerAddress();
     $scope.tracking = false;
     $scope.trackingInterval = null;
-    $scope.lastSuccess = new Date(); //TODO: null
+    $scope.lastSuccess = null;
+    $scope.isLoading = false;
 
     $scope.trackingChanged = function() {
       if ($scope.tracking === false) {
@@ -1029,7 +998,8 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
 
     $scope.trackingStart = function() {
       if ( $scope.trackingInterval !== null ) return;
-      $scope.trackingInterval = $interval($scope.testGps, 1000);
+      $scope.trackingProcess(); // call immediately and schedule another
+      $scope.trackingInterval = $interval($scope.trackingProcess, 10000);
     };
 
     $scope.trackingStop = function() {
@@ -1039,92 +1009,51 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
       }
     };
 
-    // Functions
-    $scope.testGps = function() {
+    $scope.trackingProcess = function() {
       console.log('---[ test gps ');
-      var posOptions = {timeout: 10000, enableHighAccuracy: false};
-      $cordovaGeolocation.getCurrentPosition(posOptions).then(function (position) {
-        var lat  = position.coords.latitude;
-        var long = position.coords.longitude;
-        console.log('---[ test gps (lat, long): ', lat, long);
-
-        console.log('---[ chk1 ');
-        var payload = {"entity_type": 1, "force_type": 1, "geom": "SRID=4326;POINT (50.0000000000000000 30.0000000000000000)", "user": "mobile"};
-        console.log('---[ chk2 ');
-
-        $http.post('http://192.168.33.15/api/v1/track/', payload, {
-          headers: {
-            'Authorization': 'Basic ' + btoa('admin:admin')
-          }
-        }).success(function() {
-          console.log('----[ testGps.posted');
+      $scope.isLoading = true;
+      geolocationService.getCurrentPosition().then(function (position) {
+        console.log('Current location found: ', position);
+        trackerService.post(position).then(function(){
+          $scope.isLoading = false;
           $scope.lastSuccess = new Date();
-        }).error(function(err) {
-          // can be moved to callFailure(err)
-          console.log('----[ testGps.failed: ', err);
+        }, function(error) {
+          $scope.isLoading = false;
+          $ionicLoading.show({
+            template: 'Cannot post latest location. ' + error,
+            duration: 1000
+          });
         });
-      }, function(err) {
-        // error
-        console.log('---[ test gps, err:', err);
+      }, function (reason) {
+        $scope.isLoading = false;
+        $ionicLoading.show({
+          template: 'Cannot obtain current location. ' + reason,
+          duration: 1000
+        });
       });
     };
   })
 
-.controller('loginCtrl', function($scope, $location, $http, networkService, $filter, $cordovaToast, VIDA_localDB){
+.controller('loginCtrl', function($scope, $location, $http, networkService, $filter, $cordovaToast, VIDA_localDB,
+                                  loginService){
   console.log('---------------------------------- loginCtrl');
-
   $scope.loginRequest = 0;
   $scope.credentials = {};
-
-  var doLogin = function(credentials, success, error){
-    var _authentication = btoa(credentials.username + ":" + credentials.password);
-    var config = {};
-    config.headers = {};
-    if (_authentication !== null){
-      config.headers.Authorization = 'Basic ' + _authentication;
-    } else {
-      config.headers.Authorization = '';
-    }
-    networkService.setAuthentication(credentials.username, credentials.password);
-
-    $http.get(networkService.getAuthenticationURL(), config).then(function(xhr) {
-      if (xhr.status === 200){
-        success();
-      } else {
-        error(xhr.status);
-        alert(xhr.status);
-      }
-    }, function(e) {
-      if (e) {
-        if (e.status === 401) {
-          $cordovaToast.showShortBottom(($filter('translate')('error_wrong_credentials')));
-        } else {
-          alert($filter('translate')('error_connecting_server') + e.status + ": " + e.description);
-        }
-      }
-
-      error(e);
-    });
-  };
 
   $scope.login = function(url) {
     // Request authorization
     if (($scope.credentials.username) && ($scope.credentials.password)) {
-
       $scope.loginRequest++;
-      doLogin($scope.credentials,
-      function() {
-        // Success!
-        $location.path(url);
-        VIDA_localDB.queryDB_update_settings();
-        $scope.loginRequest--;
-      },
-      function(error) {
-        // Error!
-
-        $scope.loginRequest--;
-      });
-
+      loginService.login($scope.credentials.username, $scope.credentials.password).then(
+        function(){
+          $location.path(url);
+          VIDA_localDB.queryDB_update_settings();
+          $scope.loginRequest--;
+        },
+        function(){
+          $scope.loginRequest--;
+        }
+      );
     } else {
       if (!($scope.credentials.username) && !($scope.credentials.password)) {
         $cordovaToast.showShortBottom($filter('translate')('dialog_error_username_password'));
@@ -1137,11 +1066,117 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
   };
 })
 
-.controller('createCtrl', function($scope, $cordovaBarcodeScanner, uploadService, $location, $http,
-                                   $cordovaCamera, $cordovaActionSheet, $ionicModal){
-  $scope.changeWindow = function(url) {
-    $location.path(url);
+.controller('ReportCreateCtrl', function($scope, $rootScope, $stateParams, formService){
+  console.log("---- ReportCreateCtrl");
+  formService.getAll().then(function(forms) {
+    console.log("---- got all forms: ", forms);
+    for (var i = 0; i < forms.length; i++) {
+      forms[i].schema = JSON.parse(forms[i].schema);
+    }
+
+    $rootScope.forms = forms;
+  });
+})
+
+.controller('ReportDetailCtrl', function($scope, $rootScope, $stateParams, $cordovaActionSheet, $cordovaCamera, $filter,
+                                         $ionicLoading){
+  console.log("---- ReportDetailCtrl");
+  $scope.form = $rootScope.forms[$stateParams.reportId];
+  $scope.report = {};
+
+  //for (var key in $scope.form.schema.properties) {
+  //  var val = $scope.form.schema.properties[key];
+  //  if (val.enum) {
+  //    $scope.report[key] = val.enum[1];
+  //  }
+  //}
+  $scope.selectChanged = function(propName) {
+    console.log('++++[ propName: ', propName, this.report[propName]);
+    //$scope.report[propName] = this.report[propName];
   };
+
+  $scope.save = function() {
+    console.log('----[ save: ', $scope.report);
+  };
+
+  $scope.showHint = function(msg) {
+    console.log('----[ ', msg);
+    $ionicLoading.show({
+      template: msg,
+      duration: 2000
+    });
+  };
+
+  $scope.hasMedia = function() {
+    return typeof $scope.getMediaPropName() != 'undefined';
+  };
+
+  $scope.getMediaPropName = function() {
+    if ('photos' in $scope.form.schema.properties)
+      return 'photos';
+    if ('Photos' in $scope.form.schema.properties)
+      return 'Photos';
+  };
+
+  $scope.showCameraModal = function() {
+    var prevPicture = false;
+    var options = {
+      title: $filter('translate')('title_picture_dialog'),
+      buttonLabels: [$filter('translate')('modal_picture_take_picture'), $filter('translate')('modal_picture_choose_from_library')],
+      addCancelButtonWithLabel: $filter('translate')('modal_cancel'),
+      androidEnableCancelButton : true,
+      winphoneEnableCancelButton : true
+    };
+
+    if ($scope.hasPlaceholderImage) {
+      options.buttonLabels = [$filter('translate')('modal_picture_take_picture'),
+        $filter('translate')('modal_picture_choose_from_library'),
+        $filter('translate')('modal_picture_remove_picture')];
+      prevPicture = true;
+    }
+
+    $cordovaActionSheet.show(options)
+      .then(function(btnIndex) {
+        if (prevPicture) {
+          if (btnIndex != 3) {
+            $scope.takeCameraPhoto_Personal(btnIndex);
+          } else {
+            document.getElementById('personal_photo').src = peopleService.getPlaceholderImage();
+            $scope.hasPlaceholderImage = true;
+          }
+        } else {
+          $scope.takeCameraPhoto_Personal(btnIndex);
+        }
+      });
+  };
+
+  $scope.takeCameraPhoto_Personal = function(source) {
+    var options = {
+      quality: 90,
+      destinationType: Camera.DestinationType.FILE_URI,  // write to file
+      sourceType: source,
+      allowEdit: true,
+      encodingType: Camera.EncodingType.JPEG,
+      popoverOptions: CameraPopoverOptions,
+      saveToPhotoAlbum: false
+    };
+
+    $cordovaCamera.getPicture(options).then(function(imagePath) {
+      if (($scope.report[$scope.getMediaPropName()] instanceof Array) === false) {
+        $scope.report[$scope.getMediaPropName()] = [];
+      }
+      $scope.report[$scope.getMediaPropName()].push(imagePath);
+      console.log('----[ imagePath: ', imagePath);
+      //document.getElementById('personal_photo').src = "data:image/jpeg;base64," + imageData;
+      $scope.hasPlaceholderImage = false;
+    }, function(err) {
+      console.log(err);
+    });
+  };
+})
+
+.controller('WebsiteCtrl', function($scope){
+  console.log("---- WebsiteCtrl");
 })
 
 .controller('ShelterSearchCtrl', function ($rootScope, $scope, $state, shelterService) {
