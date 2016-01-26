@@ -1,28 +1,20 @@
 <ion-view title="{{'title_reports' | translate}}">
   <ion-content padding="true" >
     <form>
-      <!--
-      <ion-toggle ng-model="tracking" ng-change="trackingChanged()" toggle-class="toggle-positive">{{'tracking' | translate}}</ion-toggle>
-      <button class="button button-positive button-block" ng-click="sync()">{{'Test OAuth'}}</button>
-      <button class="button icon ion-gear-a"></button>
-
-        <span class="input-label" am-time-ago="lastSuccess"></span>
-        <ion-spinner icon="ripple" ng-show="isLoading"></ion-spinner>
-      -->
       <div class="item item-divider">
         <span>Sync</span>
       </div>
 
-      <div class="item item-icon-left">
+      <div class="item item-icon-left" ng-click="sync()">
         <i class="icon ion-android-sync" ng-show="!isLoading" ng-click="sync()"></i>
         <ion-spinner class="icon" icon="spiral" ng-show="isLoading"></ion-spinner>
         <span>Last Success</span>
         <span am-time-ago="lastSuccess"></span>
       </div>
-      <div class="item item-icon-left">
+      <div class="item item-icon-left" ng-click="sync()">
         <i class="icon ion-clipboard"></i>
         <span>Reports Are Pending!</span>
-        <span class="badge badge-assertive" ng-click="sync()">2</span>
+        <span class="badge badge-assertive">2</span>
       </div>
 
     </form>

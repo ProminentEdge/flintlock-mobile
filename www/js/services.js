@@ -306,6 +306,7 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
           //       dialog is supposed to come up which does not on mobile browser so the request stays active until
           //       timeout is reached. this is why we are using a short timeout for this request and catching status 0
           //       assuming that it is the bad credentials.
+          //       When the server ip is invalid, timeout will occur as well. not possible to know when
           if (error.status === 401 || error.status === 0) {
             $cordovaToast.showShortBottom(($filter('translate')('error_invalid_credentials')));
           } else if (error.status === 404) {
@@ -381,6 +382,7 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
         headers: {
           "Authorization": networkService.getBasicAuthentication()
         },
+        timeout: 10000,
         isArray: true,
         transformResponse: $http.defaults.transformResponse.concat([
           function (data, headersGetter) {

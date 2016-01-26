@@ -3,7 +3,7 @@
     <ion-content padding="true" class="has-header">
       <form>
         <ion-toggle ng-model="tracking" ng-change="trackingChanged()" toggle-class="toggle-positive">{{'tracking' | translate}}</ion-toggle>
-        <label class="item item-input">
+        <label class="item item-input item-icon-right">
           <span class="input-label">{{'Last Success'}}</span>
           <span class="input-label" am-time-ago="lastSuccess"></span>
           <ion-spinner icon="ripple" ng-show="isLoading"></ion-spinner>
