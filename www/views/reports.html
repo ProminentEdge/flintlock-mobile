@@ -1,0 +1,44 @@
+<ion-view title="{{'title_reports' | translate}}">
+  <ion-content padding="true" >
+    <form>
+      <!--
+      <ion-toggle ng-model="tracking" ng-change="trackingChanged()" toggle-class="toggle-positive">{{'tracking' | translate}}</ion-toggle>
+      <button class="button button-positive button-block" ng-click="sync()">{{'Test OAuth'}}</button>
+      <button class="button icon ion-gear-a"></button>
+
+        <span class="input-label" am-time-ago="lastSuccess"></span>
+        <ion-spinner icon="ripple" ng-show="isLoading"></ion-spinner>
+      -->
+      <div class="item item-divider">
+        <span>Sync</span>
+      </div>
+
+      <div class="item item-icon-left">
+        <i class="icon ion-android-sync" ng-show="!isLoading" ng-click="sync()"></i>
+        <ion-spinner class="icon" icon="spiral" ng-show="isLoading"></ion-spinner>
+        <span>Last Success</span>
+        <span am-time-ago="lastSuccess"></span>
+      </div>
+      <div class="item item-icon-left">
+        <i class="icon ion-clipboard"></i>
+        <span>Reports Are Pending!</span>
+        <span class="badge badge-assertive" ng-click="sync()">2</span>
+      </div>
+
+    </form>
+
+    <div class="spacer" style="width: 300px; height: 40px;"></div>
+
+    <form>
+      <ion-list>
+        <div class="item item-divider">
+          Create Report
+        </div>
+        <a class="item item-icon-right" ng-repeat="(key, value) in forms" href="#/vida/report-create/report-detail/{{key}}">
+          {{value.schema.title}}
+          <i class="icon ion-chevron-right icon-accessory"></i>
+        </a>
+      </ion-list>
+    </form>
+  </ion-content>
+</ion-view>

@@ -152,7 +152,7 @@ angular.module('vida', ['ionic', 'ngCordova', 'vida.directives', 'vida.controlle
     url: '/report-create',
     views: {
       'view-report-create': {
-        templateUrl: 'views/report-create.html',
+        templateUrl: 'views/reports.html',
         controller: 'ReportCreateCtrl'
       }
     }

@@ -1,8 +1,8 @@
 (function() {
   var translations = {
     'title_tracking': 'Tracking',
-    'title_report_create': 'Create Report',
-    'title_Website': 'Website',
+    'title_reports': 'Reports',
+    'title_website': 'Website',
     'title_search': 'Search',
     'title_create': 'Create Person',
     'title_edit': 'Edit Person',
@@ -32,7 +32,7 @@
     'modal_picture_remove_picture': 'Remove Picture',
     'modal_cancel': 'Cancel',
     'tab_tracking': 'Tracking',
-    'tab_report_create': 'Report',
+    'tab_reports': 'Reports',
     'tab_website': 'Website',
     'tab_search': 'Search',
     'tab_create': 'Create',

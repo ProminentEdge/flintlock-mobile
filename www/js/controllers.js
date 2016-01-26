@@ -1067,16 +1067,25 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
   };
 })
 
-.controller('ReportCreateCtrl', function($scope, $rootScope, $stateParams, formService){
+.controller('ReportCreateCtrl', function($scope, $rootScope, $stateParams, formService, $cordovaToast, $timeout){
   console.log("---- ReportCreateCtrl");
-  formService.getAll().then(function(forms) {
-    console.log("---- got all forms: ", forms);
-    for (var i = 0; i < forms.length; i++) {
-      forms[i].schema = JSON.parse(forms[i].schema);
-    }
+  $scope.lastSuccess = null;
 
-    $rootScope.forms = forms;
-  });
+  $scope.sync = function() {
+    $scope.isLoading = true;
+    formService.getAll().then(function(forms) {
+      console.log("---- got all forms: ", forms);
+      for (var i = 0; i < forms.length; i++) {
+        forms[i].schema = JSON.parse(forms[i].schema);
+      }
+
+      $rootScope.forms = forms;
+      $scope.lastSuccess = new Date();
+      $scope.isLoading = false;
+    });
+  };
+
+  $scope.sync();
 })
 
 .controller('ReportDetailCtrl', function($scope, $rootScope, $stateParams, $cordovaActionSheet, $cordovaCamera, $filter,
