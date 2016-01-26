@@ -3,7 +3,8 @@
     <form>
       <div class="item item-input" ng-if="propName !== 'photos'" ng-repeat="(propName, prop) in form.schema.properties">
         <span class="input-label">{{propName}}:</span>
-        <input ng-if="prop.type === 'string' && !prop.enum" type="text" placeholder="{{prop.description}}" ng-model="report[propName]"/>
+        <input ng-if="prop.type === 'string' && !prop.enum" type="text" placeholder="{{prop.description}}" ng-model="report[propName]"
+               autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
         <select ng-if="prop.enum" id="injury" ng-model="report[propName]">
           <option value="" > -- choose -- </option>>
           <option ng-repeat="item in prop.enum" >{{ item }}</option>

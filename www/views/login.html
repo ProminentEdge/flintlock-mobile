@@ -10,21 +10,17 @@
       <ion-list>
         <label class="item item-input">
           <span class="input-label">{{'login_username' | translate}}</span>
-          <input type="text" placeholder="" ng-model="credentials.username">
+          <input type="text" placeholder="" ng-model="credentials.username"
+                 autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
         </label>
         <label class="item item-input">
           <span class="input-label">{{'login_password' | translate}}</span>
-          <input type="password" placeholder="" ng-model="credentials.password">
+          <input type="password" placeholder="" ng-model="credentials.password"
+                 autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
         </label>
       </ion-list>
-      <div class="text-center" ng-if="loginRequest > 0">
-        <ion-spinner icon="ripple"></ion-spinner>
-      </div>
-      <div ng-if="loginRequest <= 0">
-        <div class="spacer" style="height: 30px;"></div> <!--Test-->
-      </div>
+
       <button class="button button-positive button-block" ng-click="login('/tabs')">{{'button_login' | translate}}</button>
-      <a href="#/signup" class="button button-positive button-clear button-block ">{{'button_request_account' | translate}}</a>
     </form>
   </ion-content>
 </ion-view>

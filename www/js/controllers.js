@@ -1190,8 +1190,14 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
   };
 })
 
-.controller('WebsiteCtrl', function($scope){
+.controller('WebsiteCtrl', function($scope, $cordovaInAppBrowser){
   console.log("---- WebsiteCtrl");
+
+  $scope.go = function() {
+    $cordovaInAppBrowser.open('https://sites.google.com/a/flintlock.net/flintlock16dev/', '_system', {
+      location: 'yes'
+    });
+  };
 })
 
 .controller('ShelterSearchCtrl', function ($rootScope, $scope, $state, shelterService) {

@@ -297,17 +297,18 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
           deferred.resolve();
         } else {
           deferred.reject(xhr);
-          alert(xhr.status);
         }
       }, function(error) {
         if (error) {
           if (error.status === 401) {
-            deferred.reject(xhr);
             $cordovaToast.showShortBottom(($filter('translate')('error_wrong_credentials')));
           } else {
-            alert($filter('translate')('error_connecting_server') + error.status + ": " + error.description);
+            $cordovaToast.showShortBottom($filter('translate')('error_connecting_server') + error.status + ": " + error.description);
           }
+        } else {
+          $cordovaToast.showShortBottom($filter('translate')('error_connecting_server'));
         }
+        deferred.reject();
       });
     return deferred.promise;
   };
