@@ -13,6 +13,7 @@
     "angular-resource": "1.4.3",
     "ng-cordova-oauth": "~0.2.2",
     "angular-moment": "~0.10.3",
-    "moment": "~2.11.1"
+    "moment": "~2.11.1",
+    "jsSHA": "2.0.2"
   }
 }

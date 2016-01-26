@@ -1079,24 +1079,45 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
 })
 
 .controller('ReportDetailCtrl', function($scope, $rootScope, $stateParams, $cordovaActionSheet, $cordovaCamera, $filter,
-                                         $ionicLoading){
+                                         $ionicLoading, uploadService, utilService, $cordovaProgress){
   console.log("---- ReportDetailCtrl");
   $scope.form = $rootScope.forms[$stateParams.reportId];
   $scope.report = {};
+  $scope.mediaPendingUploadMap = {};
 
-  //for (var key in $scope.form.schema.properties) {
-  //  var val = $scope.form.schema.properties[key];
-  //  if (val.enum) {
-  //    $scope.report[key] = val.enum[1];
-  //  }
-  //}
-  $scope.selectChanged = function(propName) {
-    console.log('++++[ propName: ', propName, this.report[propName]);
-    //$scope.report[propName] = this.report[propName];
+  $scope.addMedia = function(filePath) {
+    console.log('----[ addMedia: ', filePath);
+    if (($scope.report[$scope.getMediaPropName()] instanceof Array) === false) {
+      $scope.report[$scope.getMediaPropName()] = [];
+    }
+
+    utilService.getFileAsBinaryString(filePath, false).then( function(result) {
+      var fileSha1 = new jsSHA("SHA-1", "BYTES");
+      fileSha1.update(result);
+      filenameSha1 = fileSha1.getHash("HEX") + '.jpg';
+      $scope.mediaPendingUploadMap[filenameSha1] = filePath;
+      $scope.report[$scope.getMediaPropName()].push(filenameSha1);
+      console.log('----[ filenameSha1: ', filenameSha1);
+    }, function(err) {
+      console.log('---[ error. failed to get media file binary data: ', err);
+    });
   };
 
   $scope.save = function() {
     console.log('----[ save: ', $scope.report);
+    $cordovaProgress.showSimpleWithLabelDetail(true, "Saving", "Uploading Report");
+    uploadService.uploadReport($scope.report, $scope.form.resource_uri).then(function() {
+      $cordovaProgress.hide();
+      $cordovaProgress.showSimpleWithLabelDetail(true, "Saving", "Uploading Media");
+      var vals = [];
+      for (var key in $scope.mediaPendingUploadMap) {
+        vals.push($scope.mediaPendingUploadMap[key]);
+      }
+      uploadService.uploadMediaArray(vals).then(function(filePathsFailed, filePathsSucceededFileNames){
+        console.log('uploadMediaArray completed. original: ', vals, ', fails: ', filePathsFailed, ', succeess: ', filePathsSucceededFileNames);
+        $cordovaProgress.hide();
+      });
+    });
   };
 
   $scope.showHint = function(msg) {
@@ -1161,16 +1182,10 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
       saveToPhotoAlbum: false
     };
 
-    $cordovaCamera.getPicture(options).then(function(imagePath) {
-      if (($scope.report[$scope.getMediaPropName()] instanceof Array) === false) {
-        $scope.report[$scope.getMediaPropName()] = [];
-      }
-      $scope.report[$scope.getMediaPropName()].push(imagePath);
-      console.log('----[ imagePath: ', imagePath);
-      //document.getElementById('personal_photo').src = "data:image/jpeg;base64," + imageData;
-      $scope.hasPlaceholderImage = false;
-    }, function(err) {
-      console.log(err);
+    $cordovaCamera.getPicture(options).then(
+      $scope.addMedia,
+      function(err) {
+        console.log(err);
     });
   };
 })

@@ -64,7 +64,87 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
   };
 }])
 
-.service('uploadService', function($http, networkService) {
+.service('uploadService', function($http, networkService, $q, geolocationService, $cordovaFileTransfer) {
+  var service_ = this;
+
+  // upload media in the provided array
+  this.uploadMedia = function(filePath) {
+    var options = new FileUploadOptions();
+    options.fileKey = 'file';
+    options.fileName = 'filenameWithExtension.jpg';
+    options.headers = {
+      'Content-Type': undefined,
+      'Authorization': networkService.getAuthenticationHeader().headers.Authorization
+    };
+    return $cordovaFileTransfer.upload(networkService.getFileServiceURL(), filePath, options);
+  };
+
+  //TODO: when an iten in the array failes, still need to return filehashes so that feature can be uploadeded with missing files.
+  this.uploadMediaArray = function(filePaths) {
+    if (!filePaths) {
+      filePaths = [];
+    }
+
+    var deferred = $q.defer();
+    var filePathsFailed = [];
+    var filePathsSucceededFileNames = [];
+
+    var onCompleted = function(succeeded, newFilename) {
+      var completedFilePath = filePaths.pop();
+      if (succeeded) {
+        filePathsSucceededFileNames.push(newFilename);
+      } else {
+        filePathsFailed.push(completedFilePath);
+      }
+      if (filePaths.length === 0) {
+        deferred.resolve(filePathsFailed, filePathsSucceededFileNames);
+      } else {
+        uploadAnother();
+      }
+    };
+
+    var uploadAnother = function() {
+      if (filePaths.length > 0) {
+        service_.uploadMedia(filePaths.slice(-1).pop()).then(function (data) {
+          onCompleted(true, data.name);
+        }, function (e) {
+          onCompleted(false)
+        });
+      } else {
+        // assume success, no failed files and no new filenames
+        deferred.resolve([], []);
+      }
+    };
+
+    uploadAnother();
+    return deferred.promise;
+  };
+
+  this.uploadReport = function(report, formUri) {
+    var deferred = $q.defer();
+
+    geolocationService.getCurrentPosition().then(function(position) {
+      var payload = {
+        "data": report,
+        "geom": geolocationService.positionToWKT(position),
+        "form": formUri
+      };
+
+      $http.post(networkService.getReportURL(), JSON.stringify(payload), {
+        transformRequest: angular.identity,
+        headers: {
+          'Authorization': networkService.getAuthenticationHeader().headers.Authorization
+        }
+      }).success(function() {
+        deferred.resolve();
+      }).error(function(e) {
+        deferred.reject(e);
+      });
+    });
+
+    return deferred.promise;
+  };
+
   this.uploadPhotoToUrl = function(photo, uploadUrl, callSuccess, callFailure) {
 
     var photoBlob = dataURLtoBlob(photo);
@@ -128,6 +208,29 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
   };
 })
 
+.service('utilService', function($cordovaFile, $q) {
+  var service_ = this;
+
+  // given a full file path, get the binary data in the file
+  this.getFileAsBinaryString = function(filePath, encodeAsBase64) {
+    var deferred = $q.defer();
+    var lastSlashIndex = filePath.lastIndexOf("/");
+    var fileDir = filePath.substring(0, lastSlashIndex);
+    var filename = filePath.substring(lastSlashIndex + 1);
+    $cordovaFile.readAsBinaryString(fileDir, filename).then(function(data) {
+      if (encodeAsBase64) {
+        deferred.resolve(btoa(data));
+      } else {
+        deferred.resolve(data);
+      }
+    }, function(err) {
+      deferred.reject(err);
+    });
+    return deferred.promise;
+  };
+})
+
+
 .factory('geolocationService', function ($q, $timeout) {
   // if call has been made in the past 1 second, don't hit the api
   var currentPositionCache;
@@ -153,19 +256,22 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
         return deferred.promise;
       }
       return $q.when(currentPositionCache);
+    },
+    positionToWKT: function(position) {
+      return "SRID=4326;POINT (" + position.coords.longitude + " " + position.coords.latitude + ")";
     }
   };
 })
 
 
-.service('trackerService', function($http, $q, networkService) {
+.service('trackerService', function($http, $q, networkService, geolocationService) {
   this.post = function (position) {
     var deferred = $q.defer();
 
     var payload = {
       "entity_type": 1,
       "force_type": 1,
-      "geom": "SRID=4326;POINT (" + position.coords.longitude + " " + position.coords.latitude + ")",
+      "geom": geolocationService.positionToWKT(position),
       "user": "mobile"
     };
 

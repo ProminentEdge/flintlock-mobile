@@ -18,10 +18,10 @@
         <button ng-click="showCameraModal()" style="" class="button icon ion-camera"></button>
       </label>
       <ion-list>
-        <ion-item ng-repeat="imageData in report[getMediaPropName()]">
+        <ion-item ng-repeat="mediaHash in report[getMediaPropName()]">
           <img style="max-width: 250px"
-               ng-src="{{imageData}}"
-               err-src="{{peopleService.getPlaceholderImage()}}" ng-model="person.photo"/>
+               ng-src="{{mediaPendingUploadMap[mediaHash]}}"
+               err-src="{{peopleService.getPlaceholderImage()}}"/>
         </ion-item>
       </ion-list>
       <div>

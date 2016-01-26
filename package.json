@@ -52,7 +52,8 @@
       "id": "org.pbernasconi.progressindicator"
     },
     "cordova-plugin-geolocation",
-    "cordova-plugin-inappbrowser"
+    "cordova-plugin-inappbrowser",
+    "cordova-plugin-file-transfer"
   ],
   "cordovaPlatforms": [
     "android",
