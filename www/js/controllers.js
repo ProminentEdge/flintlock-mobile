@@ -1,7 +1,7 @@
 angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.translate'])
 
 
-.controller('AppCtrl', function($rootScope, $scope, $ionicModal, $timeout, shelterService, $translate, VIDA_localDB, networkService) {
+.controller('AppCtrl', function($rootScope, $scope, $ionicModal, $timeout, shelterService, $translate, configService) {
   console.log('---------------------------------- AppCtrl');
   $translate.instant("title_search");
   console.log('---------------------------------- translate: ', $translate.instant("title_search"));
@@ -61,17 +61,11 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
   // initialize once. we will only work with this created object from now on
   $rootScope.markers = {};
 
-  // Set values from DB on startup
-  VIDA_localDB.queryDB_select('configuration', 'settings', function (results) {
-    if (results.length > 0) {
-      var DBSettings = JSON.parse(results[0].settings);
-      networkService.SetConfigurationFromDB(DBSettings);
-    }
-  });
 })
 
 .controller('PersonDetailEditCtrl', function($scope, $state, $rootScope, $stateParams, $http, shelter_array, $cordovaToast,
-                                             networkService, $filter, $cordovaActionSheet, $cordovaCamera, optionService, shelterService, $cordovaProgress) {
+                                             $filter, $cordovaActionSheet, $cordovaCamera, configService, shelterService,
+                                             $cordovaProgress) {
   console.log('---------------------------------- PersonDetailEditCtrl');
 
   $scope.setupSaveCancelButtons = function() {
@@ -119,106 +113,67 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
   console.log('---------------------------------- ShelterSearchCtrl');
 })
 
-.controller('SettingsCtrl', function($scope, $location, optionService, VIDA_localDB,
-                                     networkService, $translate, $cordovaOauth){
-    console.log('---------------------------------- SettingsCtrl');
+.controller('SettingsCtrl', function($scope, $location, configService, $translate, $cordovaOauth){
+  console.log('---------------------------------- SettingsCtrl');
 
-    $scope.networkAddr = networkService.getServerAddress();
-    $scope.networkService = networkService;
-
-    // Functions
-    $scope.logout = function(url) {
-      // Can go directly to '/login'
-      $location.path(url);
-    };
-
-    $scope.testOauth = function() {
-      // Can go directly to '/login'
-      console.log('---[ testOauth: ');
-
-      $cordovaOauth.google("870172265350-qpj5qtn1vddqqkqpbsjhseifehb4j9g3.apps.googleusercontent.com", ["email"]).then(function(result) {
-        console.log("Response Object -> " + JSON.stringify(result));
-      }, function(error) {
-        console.log("Error -> " + error);
-      });
-    };
-
-    $scope.saveServerIP = function(IP) {
-      networkService.setServerAddress(IP);
-
-      VIDA_localDB.queryDB_update_settings();
-    };
-
-    $scope.switchLanguage = function() {
-      if (this.current_language.value === "English")
-        $translate.use('en');
-      else if (this.current_language.value === "Spanish")
-        $translate.use('es');
-      else
-        $translate.use('en');
-
-      networkService.setLanguage(this.current_language.value);
-      VIDA_localDB.queryDB_update_settings();
-    };
-
-    // Init
-    $scope.language_options = optionService.getLanguageOptions();
-
-    for(var i = 0; i < $scope.language_options.length; i++){
-      if ($scope.language_options[i].value === networkService.getConfiguration().language){
-        $scope.current_language = $scope.language_options[i];
-      }
+  $scope.networkAddr = configService.getServerAddress();
+  $scope.configService = configService;
+  $scope.username = configService.getUsername();
+  $scope.language_options = [
+    {
+      "name": 'settings_language_english',
+      "value": "English"
+    },
+    {
+      "name": 'settings_language_spanish',
+      "value": "Spanish"
     }
+  ];
 
-    if ($scope.current_language === undefined)
-      $scope.current_language = $scope.language_options[0];
+  for(var i = 0; i < $scope.language_options.length; i++){
+    if ($scope.language_options[i].value === configService.getLanguage()){
+      $scope.current_language = $scope.language_options[i];
+    }
+  }
 
-    // Test Show From DB
-    $scope.show_configuration_from_db = function() {
-      VIDA_localDB.queryDB_select('configuration', 'settings', function(results){
-        console.log(results);
-      });
-    };
+  if ($scope.current_language === undefined)
+    $scope.current_language = $scope.language_options[0];
 
-    // Test Insert To DB
-    $scope.insert_config_to_db = function() {
-      var parameters = [{}, {}, {}];
-      parameters[0].column_name = 'server_ip';
-      parameters[0].value = networkService.getServerAddress();
-      parameters[1].column_name = 'username';
-      parameters[1].value = networkService.getAuthentication().username;
-      parameters[2].column_name = 'password';
-      parameters[2].value = networkService.getAuthentication().password;
 
-      var JSONObject = "'{\"configuration\":{" +
-        "\"" + parameters[0].column_name + "\":\"" + parameters[0].value + "\", " +
-        "\"" + parameters[1].column_name + "\":\"" + parameters[1].value + "\", " +
-        "\"" + parameters[2].column_name + "\":\"" + parameters[2].value + "\" }}'";
+  $scope.logout = function(url) {
+    // Can go directly to '/login'
+    $location.path(url);
+  };
 
-      VIDA_localDB.queryDB_insert('configuration', JSONObject);
-    };
+  $scope.testOauth = function() {
+    // Can go directly to '/login'
+    console.log('---[ testOauth: ');
 
-    // Test Save/Update To DB
-    $scope.save_configuration_to_db = function() {
-      var parameters = [{}, {}, {}];
-      parameters[0].column_name = 'server_ip';
-      parameters[0].value = networkService.getServerAddress();
-      parameters[1].column_name = 'username';
-      parameters[1].value = networkService.getAuthentication().username;
-      parameters[2].column_name = 'password';
-      parameters[2].value = networkService.getAuthentication().password;
+    $cordovaOauth.google("870172265350-qpj5qtn1vddqqkqpbsjhseifehb4j9g3.apps.googleusercontent.com", ["email"]).then(function(result) {
+      console.log("Response Object -> " + JSON.stringify(result));
+    }, function(error) {
+      console.log("Error -> " + error);
+    });
+  };
 
-      var JSONObject = "'{\"configuration\":{" +
-        "\"" + parameters[0].column_name + "\":\"" + parameters[0].value + "\", " +
-        "\"" + parameters[1].column_name + "\":\"" + parameters[1].value + "\", " +
-        "\"" + parameters[2].column_name + "\":\"" + parameters[2].value + "\" }}'";
+  $scope.saveServerAddress = function(networkAddr) {
+    configService.setServerAddress(networkAddr);
+  };
 
-      VIDA_localDB.queryDB_update('configuration', JSONObject);
-    };
+  $scope.switchLanguage = function() {
+    if (this.current_language.value === "English")
+      $translate.use('en');
+    else if (this.current_language.value === "Spanish")
+      $translate.use('es');
+    else
+      $translate.use('en');
+
+    configService.setLanguage(this.current_language.value);
+  };
 })
 
-.controller('TrackingCtrl', function($scope, $location, optionService, VIDA_localDB,
-                                     networkService, $translate, $interval, geolocationService, trackerService,
+.controller('TrackingCtrl', function($scope, $location, configService,
+                                     $translate, $interval, geolocationService, trackerService,
                                      $filter, $timeout){
     console.log('---------------------------------- TrackingCtrl');
     $scope.tracking = false;
@@ -291,23 +246,19 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
   };
 })
 
-.controller('loginCtrl', function($scope, $location, $http, networkService, $filter, $cordovaToast, VIDA_localDB,
+.controller('loginCtrl', function($scope, $location, $http, configService, $filter, $cordovaToast,
                                   loginService, $cordovaProgress){
   console.log('---------------------------------- loginCtrl');
-  $scope.credentials = {
-    username: networkService.configuration.username,
-    password: networkService.configuration.password
-  };
+  $scope.username = configService.getUsername();
+  $scope.password = configService.getPassword();
 
   $scope.login = function(gotoUrl) {
     // Request authorization
-    if (($scope.credentials.username) && ($scope.credentials.password)) {
+    if (($scope.username) && ($scope.password)) {
       $cordovaProgress.showSimpleWithLabelDetail(true, "Logging in", "Verifying Credentials");
 
-      loginService.login($scope.credentials.username, $scope.credentials.password).then(
-        function(){
+      loginService.login($scope.username, $scope.password).then(function(){
           $location.path(gotoUrl);
-          VIDA_localDB.queryDB_update_settings();
           $cordovaProgress.hide();
         },
         function(){
@@ -315,27 +266,26 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
         }
       );
     } else {
-      if (!($scope.credentials.username) && !($scope.credentials.password)) {
+      if (!($scope.username) && !($scope.password)) {
         $cordovaToast.showShortBottom($filter('translate')('dialog_error_username_password'));
-      } else if (!($scope.credentials.username)) {
+      } else if (!($scope.username)) {
         $cordovaToast.showShortBottom($filter('translate')('dialog_error_username'));
-      } else if (!($scope.credentials.password)) {
+      } else if (!($scope.password)) {
         $cordovaToast.showShortBottom($filter('translate')('dialog_error_password'));
       }
     }
   };
 
   $scope.saveCredentialsWithoutVerification = function(gotoUrl) {
-    if (($scope.credentials.username) && ($scope.credentials.password)) {
-      networkService.setAuthentication($scope.credentials.username, $scope.credentials.password);
+    if (($scope.username) && ($scope.password)) {
+      configService.setAuthentication($scope.username, $scope.password);
       $location.path(gotoUrl);
-      VIDA_localDB.queryDB_update_settings();
     } else {
-      if (!($scope.credentials.username) && !($scope.credentials.password)) {
+      if (!($scope.username) && !($scope.password)) {
         $cordovaToast.showShortBottom($filter('translate')('dialog_error_username_password'));
-      } else if (!($scope.credentials.username)) {
+      } else if (!($scope.username)) {
         $cordovaToast.showShortBottom($filter('translate')('dialog_error_username'));
-      } else if (!($scope.credentials.password)) {
+      } else if (!($scope.password)) {
         $cordovaToast.showShortBottom($filter('translate')('dialog_error_password'));
       }
     }

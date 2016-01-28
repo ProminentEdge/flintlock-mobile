@@ -11,12 +11,12 @@ function dataURLtoBlob(dataURI) {
 angular.module('vida.services', ['ngCordova', 'ngResource'])
 
 
-.factory('httpRequestInterceptor', function(networkService) {
+.factory('httpRequestInterceptor', function(configService) {
    return {
       request: function (config) {
         // if request doesn't have authorization header already, add basic auth
         if (typeof config.headers.Authorization === 'undefined') {
-          config.headers.Authorization = networkService.getBasicAuthentication();
+          config.headers.Authorization = configService.getBasicAuthentication();
         }
 
         // set max timeout since if creds are not valid for endpoint with basic auth, it will go for 90 secs or whatever
@@ -57,7 +57,7 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
   };
 }])
 
-.service('uploadService', function($http, networkService, $q, geolocationService, $cordovaFileTransfer) {
+.service('uploadService', function($http, configService, $q, geolocationService, $cordovaFileTransfer) {
   var service_ = this;
 
   // upload media in the provided array
@@ -67,9 +67,9 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
     options.fileName = 'filenameWithExtension.jpg';
     options.headers = {
       'Content-Type': undefined,
-      'Authorization': networkService.getAuthenticationHeader().headers.Authorization
+      'Authorization': configService.getAuthenticationHeader().headers.Authorization
     };
-    return $cordovaFileTransfer.upload(networkService.getFileServiceURL(), filePath, options);
+    return $cordovaFileTransfer.upload(configService.getFileServiceURL(), filePath, options);
   };
 
   //TODO: when an iten in the array failes, still need to return filehashes so that feature can be uploadeded with missing files.
@@ -123,10 +123,10 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
         "form": formUri
       };
 
-      $http.post(networkService.getReportURL(), JSON.stringify(payload), {
+      $http.post(configService.getReportURL(), JSON.stringify(payload), {
         transformRequest: angular.identity,
         headers: {
-          'Authorization': networkService.getAuthenticationHeader().headers.Authorization
+          'Authorization': configService.getBasicAuthentication()
         }
       }).success(function() {
         deferred.resolve();
@@ -200,7 +200,7 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
 })
 
 
-.service('trackerService', function($http, $q, networkService, geolocationService) {
+.service('trackerService', function($http, $q, configService, geolocationService) {
   this.post = function (position) {
     var deferred = $q.defer();
 
@@ -211,7 +211,7 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
       "user": "mobile"
     };
 
-    $http.post(networkService.getTrackURL(), payload, networkService.getAuthenticationHeader()).success(function(data) {
+    $http.post(configService.getTrackURL(), payload, configService.getAuthenticationHeader()).success(function(data) {
       console.log('----[ trackerService.success: ', data);
       deferred.resolve();
     }).error(function(error) {
@@ -223,15 +223,15 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
   };
 })
 
-.service('loginService', function($http, $q, networkService, $cordovaToast, $filter) {
+.service('loginService', function($http, $q, configService, $cordovaToast, $filter) {
   this.login = function (username, password) {
     var deferred = $q.defer();
-    networkService.setAuthentication(username, password);
-    $http.get(networkService.getAuthenticationURL(),
+    configService.setAuthentication(username, password);
+    $http.get(configService.getAuthenticationURL(),
       {
         "headers": {
           "Content-Type": '',
-          "Authorization": networkService.getBasicAuthentication()
+          "Authorization": configService.getBasicAuthentication()
         },
         "timeout": 3000
       }).then(
@@ -268,11 +268,11 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
 
   this.loginAjax = function (username, password) {
     var deferred = $q.defer();
-    networkService.setAuthentication(username, password);
+    configService.setAuthentication(username, password);
 
     $.ajax({
       type: 'GET',
-      url: networkService.getAuthenticationURL(),
+      url: configService.getAuthenticationURL(),
 
       // ****************        syncronous call!        *****************
       // with basic auth, when the credentials are wrong, the app doesn't get a 401 as the 'browser'/webview is supposed
@@ -284,7 +284,7 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
 
       "headers": {
         "Content-Type": '',
-        "Authorization": networkService.getBasicAuthentication()
+        "Authorization": configService.getBasicAuthentication()
       }
     }).done(function(data, textStatus, xhr) {
       console.log('----[ ajax.done: ', xhr);
@@ -311,7 +311,7 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
   };
 })
 
-.service('formService', function($http, networkService, $resource, $q) {
+.service('formService', function($http, configService, $resource) {
   var service = this;
   var forms = [];
   var current_form = {};
@@ -319,11 +319,11 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
   current_form.link = 'None';
 
   this.getAll = function() {
-    var form = $resource(networkService.getFormURL() + ':id', {}, {
+    var form = $resource(configService.getFormURL() + ':id', {}, {
       query: {
         method: 'GET',
         headers: {
-          "Authorization": networkService.getBasicAuthentication()
+          "Authorization": configService.getBasicAuthentication()
         },
         timeout: 10000,
         isArray: true,
@@ -361,7 +361,7 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
   };
 })
 
-.service('shelterService', function($http, networkService, $resource, $q) {
+.service('shelterService', function($http, configService, $resource, $q) {
   var service = this;
   var shelters = [];
   var current_shelter = {};
@@ -369,7 +369,7 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
   current_shelter.link = 'None';
 
   this.getAll = function() {
-    var shelter = $resource(networkService.getShelterURL() + ':id', {}, {
+    var shelter = $resource(configService.getShelterURL() + ':id', {}, {
       query: {
         method: 'GET',
         isArray: true,
@@ -425,237 +425,110 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
   };
 })
 
-.service('optionService', function() {
-    var gender_options = [
-      {
-        "name": 'person_not_specified',
-        "value": "Not Specified"
-      },
-      {
-        "name": 'person_gender_male',
-        "value": "Male"
-      },
-      {
-        "name": 'person_gender_female',
-        "value": "Female"
-      },
-      {
-        "name": 'person_gender_other',
-        "value": "Other"
+.service('configService', function(localDBService, $q) {
+  var service_ = this;
+
+  // when the application is first installed & launched, these settings will be used.
+  var initialConfig_ = {
+    serverURL: "192.168.33.15",
+    username: "admin",
+    password: "admin",
+    protocol: "http",
+    language: "English",
+    workOffline: "false"
+  };
+
+  // the current config. Often has been modified by user and loaded from db
+  var config_ = null;
+
+  this.getInitialConfig = function() {
+    return initialConfig_;
+  };
+
+  this.loadConfig = function() {
+    var deferred = $q.defer();
+    localDBService.getKey('properties', 'config', true).then(function(configFromDB){
+      config_ = $.extend({}, initialConfig_);
+      config_ = $.extend( config_, configFromDB );
+      console.log('loaded config: ', config_);
+      deferred.resolve();
+    }, function() {
+      deferred.reject();
+    });
+    return deferred.promise;
+  };
+
+  this.saveConfig = function() {
+    localDBService.setKey('properties', 'config', config_).then(function(){
+      console.log('saved config: ', config_);
+    });
+  };
+
+  this.getServerAddress = function() {
+    return config_.serverURL;
+  };
+
+  this.setServerAddress = function(address) {
+    config_.serverURL = address;
+    service_.saveConfig();
+  };
+
+  this.getBasicAuthentication = function() {
+    return 'Basic ' + btoa(config_.username + ':' + config_.password);
+  };
+
+  this.getAuthenticationHeader = function() {
+    return {
+      "headers": {
+        "Authorization": service_.getBasicAuthentication()
       }
-    ];
-
-    var injury_options = [
-      {
-        "name": 'person_injury_not_injured',
-        "value": "Not Injured"
-      },
-      {
-        "name": 'person_injury_moderate',
-        "value": "Moderate"
-      },
-      {
-        "name": 'person_injury_severe',
-        "value": "Severe"
-      }
-    ];
-
-    var language_options = [
-      {
-        "name": 'settings_language_english',
-        "value": "English"
-      },
-      {
-        "name": 'settings_language_spanish',
-        "value": "Spanish"
-      }
-    ];
-
-    var nationality_options = [
-      {
-        "name": 'person_not_specified',
-        "value": "Not Specified"
-      },
-      {
-        "name": 'person_nationality_english',
-        "value": "English"
-      },
-      {
-        "name": 'person_nationality_african',
-        "value": "African"
-      },
-      {
-        "name": 'person_nationality_asian',
-        "value": "Asian"
-      }
-    ];
-
-    var default_configurations = {};
-    default_configurations.configuration = {};
-    default_configurations.configuration.serverURL = "192.168.33.15";
-    default_configurations.configuration.username = "admin";
-    default_configurations.configuration.password = "admin";
-    default_configurations.configuration.protocol = "http";
-    default_configurations.configuration.language = "English";
-    default_configurations.configuration.workOffline = "false";
-
-    this.getGenderOptions = function() {
-      return gender_options;
     };
+  };
 
-    this.getInjuryOptions = function() {
-      return injury_options;
-    };
+  this.setAuthentication = function(username, password) {
+    config_.username = username;
+    config_.password = password;
+    service_.saveConfig();
+  };
 
-    this.getLanguageOptions = function() {
-      return language_options;
-    };
+  this.getUsername = function() {
+    return config_.username;
+  };
 
-    this.getNationalityOptions = function() {
-      return nationality_options;
-    };
+  this.getPassword = function() {
+    return config_.password;
+  };
 
-    this.getDefaultConfigurations = function() {
-      return default_configurations;
-    };
+  this.getLanguage = function() {
+    return config_.language;
+  };
 
-    this.getDefaultConfigurationsJSON = function() {
-      var configs = ['serverURL', 'username', 'password', 'protocol',' language', 'workOffline'];
-      var JSONObject = "'{\"configuration\":{";
-      for (var i = 0; i < configs.length; i++){
-        JSONObject += '\"' + configs[i] + '\":\"' + default_configurations.configuration[configs[i]] + '\"';
-        if (i !== configs.length - 1)
-          JSONObject += ", ";
-      }
-      JSONObject += "}}'";
-      return JSONObject;
-    };
-  })
+  this.setLanguage = function(language) {
+    config_.language = language;
+    service_.saveConfig();
+  };
 
-  // TODO: Rename to configService
-.service('networkService', function(optionService, $translate) {
+  this.getTrackURL = function() {
+    return config_.protocol + '://' + config_.serverURL + '/api/v1/track/';
+  };
 
-    var self = this;
-    this.configuration = {};
+  this.getFormURL = function() {
+    return config_.protocol + '://' + config_.serverURL + '/api/v1/form/';
+  };
 
-    var default_config = optionService.getDefaultConfigurations();
-    this.configuration.username = default_config.configuration.username;
-    this.configuration.password = default_config.configuration.password;
-    this.configuration.serverURL = default_config.configuration.serverURL;
-    this.configuration.protocol = default_config.configuration.protocol;
-    this.configuration.language = default_config.configuration.language;
-    this.configuration.workOffline = (default_config.configuration.workOffline === 'true');
-    this.configuration.api = {};
+  this.getReportURL = function() {
+    return config_.protocol + '://' + config_.serverURL + '/api/v1/report/';
+  };
 
+  this.getFileServiceURL = function() {
+    return config_.protocol + '://' + config_.serverURL + '/api/v1/fileservice/';
+  };
 
-    this.compute_API_URLs = function() {
-      var URL = this.configuration.protocol + '://' + this.configuration.serverURL + '/api/v1';
-      this.configuration.api.trackURL = URL + '/track/';
-      this.configuration.api.formURL = URL + '/form/';
-      this.configuration.api.reportURL = URL + '/report/';
-      this.configuration.api.personURL = URL + '/person/';
-      this.configuration.api.searchURL = URL + '/person/?custom_query=';
-      this.configuration.api.fileServiceURL = URL + '/fileservice/';
-      this.configuration.api.shelterURL = URL + '/shelter/';
-      this.configuration.api.faceSearchURL = URL + '/facesearchservice/';
-    };
+  this.getAuthenticationURL = function() {
+    return service_.getFormURL();
+  };
 
-    this.compute_API_URLs();
-
-    this.SetConfigurationFromDB = function(DBSettings) {
-      // Set DB settings
-      self.configuration.username = DBSettings.configuration.username;
-      self.configuration.password = DBSettings.configuration.password;
-      self.configuration.serverURL = DBSettings.configuration.serverURL;
-      self.configuration.protocol = DBSettings.configuration.protocol;
-      self.configuration.language = DBSettings.configuration.language;
-      if (self.configuration.language === "English")
-        $translate.use('en');
-      else if (self.configuration.language === "Spanish")
-        $translate.use('es');
-      else
-        $translate.use('en');
-      self.configuration.workOffline = (DBSettings.configuration.workOffline === 'true');
-
-      self.setServerAddress(DBSettings.configuration.serverURL);
-    };
-
-    this.getServerAddress = function() {
-      return this.configuration.serverURL;
-    };
-
-    this.setServerAddress = function(Addr) {
-      this.configuration.serverURL = Addr;
-      this.compute_API_URLs();
-    };
-
-    this.getBasicAuthentication = function() {
-      var authentication = btoa(this.configuration.username + ':' + this.configuration.password);
-      return 'Basic ' + authentication;
-    };
-
-    this.getAuthenticationHeader = function() {
-      return {
-        "headers": {
-          "Authorization": self.getBasicAuthentication()
-        }
-      };
-    };
-
-    this.setAuthentication = function(username, password){
-      this.configuration.username = username;
-      this.configuration.password = password;
-    };
-
-    this.setLanguage = function(current_language){
-      this.configuration.language = current_language;
-    };
-
-    this.getConfiguration = function(){
-      return this.configuration;
-    };
-
-    // todo: get rid of this usage
-    this.getAuthentication = function(){
-      return this.configuration;
-    };
-
-    this.getTrackURL = function() {
-      return this.configuration.api.trackURL;
-    };
-
-    this.getFormURL = function() {
-      return this.configuration.api.formURL;
-    };
-
-    this.getReportURL = function() {
-      return this.configuration.api.reportURL;
-    };
-
-    this.getPeopleURL = function() {
-      return this.configuration.api.personURL;
-    };
-
-    this.getAuthenticationURL = function() {
-      return this.configuration.api.personURL;
-    };
-
-    this.getSearchURL = function() {
-      return this.configuration.api.searchURL;
-    };
-
-    this.getFileServiceURL = function() {
-      return this.configuration.api.fileServiceURL;
-    };
-
-    this.getShelterURL = function() {
-      return this.configuration.api.shelterURL;
-    };
-
-    this.getFaceSearchServiceURL = function() {
-      return this.configuration.api.faceSearchURL;
-    };
-  })
+})
 
 //TODO: track down issue requiring $ionicPlatform.ready
 .factory('dbService', function($cordovaSQLite, $q, $ionicPlatform, utilService) {
@@ -695,62 +568,14 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
   return self;
 })
 
-.factory('VIDA_localDB', function($cordovaSQLite, dbService, networkService){
-    var self = this;
-
-    //self.addReport = function();
-
-    self.queryDB_select = function(tableName, columnName, afterQuery) {
-      return dbService.execute(db, "SELECT " + columnName + " FROM " + tableName)
-        .then(function(result){
-          afterQuery(dbService.getAll(result));
-        });
-    };
-
-    self.queryDB_update = function(tableName, JSONObject) {
-      var query = "UPDATE " + tableName + " SET settings=" + JSONObject;
-      console.log(query);
-      dbService.execute(db, query)
-        .then(function (result) {
-          console.log(result);
-        });
-    };
-
-    self.queryDB_update_settings = function(){
-      var fields = ['serverURL', 'username', 'password', 'protocol', 'language', 'workOffline'];
-      var currentConfiguration = networkService.getConfiguration();
-      var JSONObject = "'{\"configuration\":{";
-      for (var i = 0; i < fields.length; i++){
-        JSONObject += '\"' + fields[i] + '\":\"' + currentConfiguration[fields[i]] + '\"';
-        if (i !== fields.length - 1)
-          JSONObject += ", ";
-      }
-      JSONObject += "}}'";
-      var query = "UPDATE configuration SET settings=" + JSONObject;
-      console.log(query);
-      dbService.execute(db, query).then(function(result){
-        console.log(result);
-      });
-    };
-
-    self.queryDB_insert = function(tableName, JSONObject) {
-      var query = "INSERT INTO " + tableName + " VALUES (" + JSONObject + ")";
-      console.log(query);
-      dbService.execute(db, query)
-        .then(function (result) {
-          console.log(result);
-        });
-    };
-
-    return self;
-  })
-
-.service('localDBService', function($q, $cordovaSQLite, dbService, utilService) {
+.service('localDBService', function($q, $cordovaSQLite, dbService, utilService, $ionicPlatform) {
   var service_ = this;
   var localDB_ = null;
 
   this.openLocalDB = function(){
-    localDB_ = $cordovaSQLite.openDB('localDB.sqlite');
+    $ionicPlatform.ready(function() {
+      localDB_ = $cordovaSQLite.openDB('localDB.sqlite');
+    });
   };
 
   this.createKVTableIfNotExist = function(tableName) {

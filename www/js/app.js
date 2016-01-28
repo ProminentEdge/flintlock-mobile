@@ -10,7 +10,7 @@ var db = null;
 angular.module('vida', ['ionic', 'ngCordova', 'vida.directives', 'vida.controllers', 'vida.services', 'leaflet-directive',
     'pascalprecht.translate', 'vida-translations-en', 'vida-translations-es', 'ngResource', 'angularMoment'])
 
-.run(function($ionicPlatform, $window, $cordovaSQLite, networkService, optionService, localDBService, $cordovaToast) {
+.run(function($ionicPlatform, $window, $cordovaSQLite, configService, localDBService, $cordovaToast) {
   $ionicPlatform.ready(function() {
     // Hide the accessory bar by default (remove this to show the accessory bar above the keyboard
     // for form inputs).
@@ -33,42 +33,26 @@ angular.module('vida', ['ionic', 'ngCordova', 'vida.directives', 'vida.controlle
     if (window.cordova){
       // ios/android testing
       if (!(window.cordova.plugins)){
-          alert("window.cordova.plugins: " + window.cordova.plugins);
+        alert("window.cordova.plugins: " + window.cordova.plugins);
       } else {
-          if (!(window.cordova.plugins.Keyboard)) {
-              alert("window.cordova.plugins.Keyboard: " + window.cordova.plugins.Keyboard);
-          }
+        if (!(window.cordova.plugins.Keyboard)) {
+            alert("window.cordova.plugins.Keyboard: " + window.cordova.plugins.Keyboard);
+        }
 
-        db = $cordovaSQLite.openDB("localDB.db");
-        var query = 'CREATE TABLE IF NOT EXISTS configuration (settings TEXT)';
-        var querySelect = 'SELECT * FROM configuration';
-        var defaultSettings = optionService.getDefaultConfigurationsJSON();
-        var queryIns = 'INSERT INTO configuration VALUES (' + defaultSettings + ')';
-        $cordovaSQLite.execute(db, query);
-        $cordovaSQLite.execute(db, querySelect).then(function(result){
-          if (result.rows.length <= 0){
-            $cordovaSQLite.execute(db, queryIns); // add default configuration row if doesn't exist
-            console.log(queryIns);
-          }
-        });
-
-        /*
+        // open the local database and load the settings
         localDBService.openLocalDB();
-        localDBService.createKVTableIfNotExist('report').then( function() {
-          var report = JSON.parse('{"photos": ["95cefda9812e774684a3befbef08e7ef4c429412.jpg", "6c9f1370865473fb7412ebbf98281bec697adad1.jpg"], "Unit/Outstation": "Dakar", "Needed By": null}');
-
-          //localDBService.setKey('report', 'r1', report).then(function(){
-            localDBService.getKey('report', 'r1', true).then(function(value){
-              $cordovaToast.showLongTop('value is: ' + value);
-              console.log('value is: ', value);
-            });
-          //});
+        // create the tables needed by the app if not already in the db
+        localDBService.createKVTableIfNotExist('properties').then( function() {
+          configService.loadConfig();
+          $cordovaToast.showLongTop('config loaded');
         });
-        */
+
+        localDBService.createKVTableIfNotExist('reports');
+        localDBService.createKVTableIfNotExist('forms');
       }
 
       if (!(navigator.camera)){
-          alert("navigator.camera: " + navigator.camera);
+        alert("navigator.camera: " + navigator.camera);
       }
     } else {
       //alert("window.cordova: " + window.cordova);
@@ -198,61 +182,6 @@ angular.module('vida', ['ionic', 'ngCordova', 'vida.directives', 'vida.controlle
       'view-website': {
         templateUrl: 'views/website.html',
         controller: 'WebsiteCtrl'
-      }
-    }
-  })
-
-  .state('vida.person-create', {
-    url: '/person-create',
-    views: {
-      'view-person-create': {
-        templateUrl: 'views/person-create.html',
-        resolve: {
-          shelter_array : function($q, networkService, $cordovaProgress) {
-            return retrieveAllShelters($q, networkService, $cordovaProgress);
-          }
-        },
-        controller: 'PersonCreateCtrl'
-      }
-    }
-  })
-
-  .state('vida.person-search', {
-    url: '/person-search',
-    views: {
-      'view-person-search': {
-        templateUrl: 'views/person-search.html',
-        controller: 'PersonSearchCtrl'
-      }
-    }
-  })
-
-  .state('vida.person-search.person-detail', {
-    url: "/person-detail/:personId",
-    views: {
-      'view-person-search@vida': {
-        templateUrl: "views/person-detail.html",
-        resolve: {
-          shelter_array : function($q, networkService) {
-            return retrieveAllShelters($q, networkService, false);
-          }
-        },
-        controller: 'PersonDetailCtrl'
-      }
-    }
-  })
-
-  .state('vida.person-search.person-detail.person-edit', {
-    url: "/person-edit",
-    views: {
-      'view-person-search@vida': {
-        templateUrl: "views/person-create.html",
-        resolve: {
-          shelter_array : function($q, networkService) {
-            return retrieveAllShelters($q, networkService, false);
-          }
-        },
-        controller: 'PersonDetailEditCtrl'
       }
     }
   })
