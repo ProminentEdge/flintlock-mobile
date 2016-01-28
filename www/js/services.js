@@ -201,7 +201,7 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
   };
 })
 
-.service('utilService', function($cordovaFile, $q) {
+.service('utilService', function($cordovaFile, $q, $cordovaToast) {
   var service_ = this;
 
   // given a full file path, get the binary data in the file
@@ -220,6 +220,11 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
       deferred.reject(err);
     });
     return deferred.promise;
+  };
+
+  this.notify = function(msg) {
+    console.log('===[ utilService, notify: ', msg);
+    $cordovaToast.showLongBottom(msg);
   };
 })
 
@@ -955,59 +960,60 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
     };
   })
 
-.factory('DBHelper', function($cordovaSQLite, $q, $ionicPlatform) {
+//TODO: track down issue requiring $ionicPlatform.ready
+.factory('dbService', function($cordovaSQLite, $q, $ionicPlatform, utilService) {
+  var self = this;
+
+  self.execute = function(db, query, parameters) {
+    parameters = parameters || [];
+    var q = $q.defer();
+
+    $ionicPlatform.ready(function() {
+      $cordovaSQLite.execute(db, query, parameters).then(
+        function(result){
+          q.resolve(result);
+      }, function(error){
+          var msg = "Error with DB - " + error.message;
+          utilService.notify(msg);
+          q.reject(error);
+        });
+    });
+    return q.promise;
+  };
+
+  self.getAll = function(result) {
+    var output = [];
+    for (var i = 0; i < result.rows.length; i++){
+      output.push(result.rows.item(i));
+    }
+    return output;
+  };
+
+  self.getById = function(result) {
+    var output = null;
+    output = angular.copy(result.rows.item(0));
+    return output;
+  };
+
+  return self;
+})
+
+.factory('VIDA_localDB', function($cordovaSQLite, dbService, networkService){
     var self = this;
 
-    self.query = function(query, parameters) {
-      parameters = parameters || [];
-      var q = $q.defer();
-
-      $ionicPlatform.ready(function() {
-        $cordovaSQLite.execute(db, query, parameters).then(
-          function(result){
-            q.resolve(result);
-        }, function(error){
-            console.log("Error with DB - " + error.message);
-            q.reject(error);
-          });
-      });
-
-      return q.promise;
-    };
-
-    self.getAll = function(result) {
-      var output = [];
-
-      for (var i = 0; i < result.rows.length; i++){
-        output.push(result.rows.item(i));
-      }
-
-      return output;
-    };
-
-    self.getById = function(result) {
-      var output = null;
-      output = angular.copy(result.rows.item(0));
-      return output;
-    };
-
-    return self;
-  })
-
-.factory('VIDA_localDB', function($cordovaSQLite, DBHelper, networkService){
-    var self = this;
+    //self.addReport = function();
 
     self.queryDB_select = function(tableName, columnName, afterQuery) {
-      return DBHelper.query("SELECT " + columnName + " FROM " + tableName)
+      return dbService.execute(db, "SELECT " + columnName + " FROM " + tableName)
         .then(function(result){
-          afterQuery(DBHelper.getAll(result));
+          afterQuery(dbService.getAll(result));
         });
     };
 
     self.queryDB_update = function(tableName, JSONObject) {
       var query = "UPDATE " + tableName + " SET settings=" + JSONObject;
       console.log(query);
-      DBHelper.query(query)
+      dbService.execute(db, query)
         .then(function (result) {
           console.log(result);
         });
@@ -1025,7 +1031,7 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
       JSONObject += "}}'";
       var query = "UPDATE configuration SET settings=" + JSONObject;
       console.log(query);
-      DBHelper.query(query).then(function(result){
+      dbService.execute(db, query).then(function(result){
         console.log(result);
       });
     };
@@ -1033,11 +1039,93 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
     self.queryDB_insert = function(tableName, JSONObject) {
       var query = "INSERT INTO " + tableName + " VALUES (" + JSONObject + ")";
       console.log(query);
-      DBHelper.query(query)
+      dbService.execute(db, query)
         .then(function (result) {
           console.log(result);
         });
     };
 
     return self;
-  });
+  })
+
+.service('localDBService', function($q, $cordovaSQLite, dbService, utilService) {
+  var service_ = this;
+  var localDB_ = null;
+
+  this.openLocalDB = function(){
+    localDB_ = $cordovaSQLite.openDB('localDB.sqlite');
+  };
+
+  this.createKVTableIfNotExist = function(tableName) {
+    var sql = 'CREATE TABLE IF NOT EXISTS ' + tableName + ' (key text not null primary key, value text not null);';
+    return dbService.execute(localDB_, sql);
+  };
+
+  this.setKey = function(tableName, key, value) {
+    var deferred = $q.defer();
+    if (typeof key !== 'string') {
+      utilService.notify('localDBService, key must be a string');
+      deferred.reject();
+    }
+
+    if (typeof value !== 'string') {
+      value = JSON.stringify(value);
+    }
+
+    var rejected = function() {
+      utilService.notify('localDBService.set, error. key: ' + key + ', value: ' + value);
+      deferred.reject();
+    };
+
+    var sql = 'SELECT key, value FROM ' + tableName + ' WHERE key=?;';
+    dbService.execute(localDB_, sql, [key]).then(function(res) {
+      if (res.rows.length === 0) {
+        var sql = 'INSERT INTO ' + tableName + ' (key, value) VALUES (?, ?);';
+        dbService.execute(localDB_, sql, [key, value]).then(function(res) {
+          deferred.resolve();
+        }, rejected);
+      } else if (res.rows.length === 1) {
+        var sql = 'UPDATE ' + tableName + ' SET value=? WHERE key=?;';
+        dbService.execute(localDB_, sql, [value, key]).then(function(res) {
+          deferred.resolve();
+        }, rejected);
+      } else {
+        utilService.notify('localDBService.set, Multiple entries for property: ' + key);
+        deferred.reject();
+      }
+    }, rejected);
+
+    return deferred.promise;
+  };
+
+  this.getKey = function(tableName, key, parse) {
+    var deferred = $q.defer();
+    if (typeof key !== 'string') {
+      utilService.notify('localDBService, key must be a string');
+      deferred.reject();
+    }
+
+    var rejected = function() {
+      utilService.notify('localDBService.get, error. key: ' + key);
+      deferred.reject();
+    };
+
+    var sql = 'SELECT key, value FROM ' + tableName + ' WHERE key=?;';
+    dbService.execute(localDB_, sql, [key]).then(function(res) {
+      if (res.rows.length === 0) {
+        deferred.resolve();
+      } else if (res.rows.length === 1) {
+        var value = res.rows.item(0).value;
+        if (parse) {
+          value = JSON.parse(value);
+        }
+        deferred.resolve(value);
+      } else {
+        utilService.notify('localDBService.get, Multiple entries for property: ' + key);
+        deferred.reject();
+      }
+    }, rejected);
+
+    return deferred.promise;
+  };
+});

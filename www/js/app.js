@@ -10,7 +10,7 @@ var db = null;
 angular.module('vida', ['ionic', 'ngCordova', 'vida.directives', 'vida.controllers', 'vida.services', 'leaflet-directive',
     'pascalprecht.translate', 'vida-translations-en', 'vida-translations-es', 'ngResource', 'angularMoment'])
 
-.run(function($ionicPlatform, $window, $cordovaSQLite, networkService, optionService) {
+.run(function($ionicPlatform, $window, $cordovaSQLite, networkService, optionService, localDBService, $cordovaToast) {
   $ionicPlatform.ready(function() {
     // Hide the accessory bar by default (remove this to show the accessory bar above the keyboard
     // for form inputs).
@@ -51,6 +51,20 @@ angular.module('vida', ['ionic', 'ngCordova', 'vida.directives', 'vida.controlle
             console.log(queryIns);
           }
         });
+
+        /*
+        localDBService.openLocalDB();
+        localDBService.createKVTableIfNotExist('report').then( function() {
+          var report = JSON.parse('{"photos": ["95cefda9812e774684a3befbef08e7ef4c429412.jpg", "6c9f1370865473fb7412ebbf98281bec697adad1.jpg"], "Unit/Outstation": "Dakar", "Needed By": null}');
+
+          //localDBService.setKey('report', 'r1', report).then(function(){
+            localDBService.getKey('report', 'r1', true).then(function(value){
+              $cordovaToast.showLongTop('value is: ' + value);
+              console.log('value is: ', value);
+            });
+          //});
+        });
+        */
       }
 
       if (!(navigator.camera)){
