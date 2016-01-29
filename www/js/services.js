@@ -113,28 +113,19 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
     return deferred.promise;
   };
 
-  this.uploadReport = function(report, formUri) {
+  this.uploadReport = function(report) {
     var deferred = $q.defer();
-
-    geolocationService.getCurrentPosition().then(function(position) {
-      var payload = {
-        "data": report,
-        "geom": geolocationService.positionToWKT(position),
-        "form": formUri
-      };
-
-      $http.post(configService.getReportURL(), JSON.stringify(payload), {
-        transformRequest: angular.identity,
-        headers: {
-          'Authorization': configService.getBasicAuthentication()
-        }
-      }).success(function() {
-        deferred.resolve();
-      }).error(function(e) {
-        deferred.reject(e);
-      });
+    delete report.timestamp_local; // is was a temp key not meant for server
+    $http.post(configService.getReportURL(), JSON.stringify(report), {
+      transformRequest: angular.identity,
+      headers: {
+        'Authorization': configService.getBasicAuthentication()
+      }
+    }).success(function() {
+      deferred.resolve();
+    }).error(function(e) {
+      deferred.reject(e);
     });
-
     return deferred.promise;
   };
 })
@@ -163,6 +154,77 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
   this.notify = function(msg) {
     console.log('===[ utilService, notify: ', msg);
     $cordovaToast.showLongBottom(msg);
+  };
+
+  this.getSHA1 = function(data, stringify) {
+    if (typeof data !== 'string' && stringify) {
+      data = JSON.stringify(data);
+    }
+    var sha1 = new jsSHA("SHA-1", "BYTES");
+    sha1.update(data);
+    return sha1.getHash("HEX");
+  };
+
+  this.getSHA1Random = function() {
+    return service_.getSHA1(Math.round(Math.random() * Math.pow(2, 48)));
+  };
+
+  //Note: $q.all does this but need the sync version
+  this.foreachWaitForCompletionAsync = function(array, operation) {
+    var deferred = $q.defer();
+    var completed = 0;
+    for (var key in array) {
+      operation(array[key]).then(function(){
+        completed++;
+        if (completed === array.length) {
+          deferred.resolve();
+        }
+      }, function(){
+        alert('operation failed for item in array');
+        deferred.reject();
+      })
+    }
+    return deferred.promise;
+  };
+
+  this.foreachWaitForCompletionSync = function(array, operation) {
+    if (!array) {
+      array = [];
+    }
+    var deferred = $q.defer();
+    var itemsFailed = [];
+    var itemsSucceededResponse = [];
+
+    var onCompleted = function (succeeded, reponse) {
+      var completed = array.pop();
+      if (succeeded) {
+        itemsSucceededResponse.push(reponse);
+      } else {
+        itemsFailed.push(completed);
+      }
+      if (array.length === 0) {
+        deferred.resolve(itemsFailed, itemsSucceededResponse);
+      } else {
+        uploadAnother();
+      }
+    };
+
+    var uploadAnother = function () {
+      if (array.length > 0) {
+        operation(array.slice(-1).pop()).then(function (data) {
+          onCompleted(true, data);
+        }, function () {
+          utilService.notify("a media failed to upload, in uploadAnother");
+          onCompleted(false)
+        });
+      } else {
+        // assume success, no failed files and no new filenames
+        deferred.resolve([], []);
+      }
+    };
+
+    uploadAnother();
+    return deferred.promise;
   };
 })
 
@@ -250,6 +312,7 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
           //       timeout is reached. this is why we are using a short timeout for this request and catching status 0
           //       assuming that it is the bad credentials.
           //       When the server ip is invalid, timeout will occur as well. not possible to know when
+          //TODO: make server return custom header instead of the basicauth prompt
           if (error.status === 401 || error.status === 0) {
             $cordovaToast.showShortBottom(($filter('translate')('error_invalid_credentials')));
           } else if (error.status === 404) {
@@ -551,7 +614,7 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
     return q.promise;
   };
 
-  self.getAll = function(result) {
+  self.getResultAll = function(result) {
     var output = [];
     for (var i = 0; i < result.rows.length; i++){
       output.push(result.rows.item(i));
@@ -559,7 +622,7 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
     return output;
   };
 
-  self.getById = function(result) {
+  self.getResultById = function(result) {
     var output = null;
     output = angular.copy(result.rows.item(0));
     return output;
@@ -571,6 +634,7 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
 .service('localDBService', function($q, $cordovaSQLite, dbService, utilService, $ionicPlatform) {
   var service_ = this;
   var localDB_ = null;
+  var tables_ = {};
 
   this.openLocalDB = function(){
     $ionicPlatform.ready(function() {
@@ -579,12 +643,25 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
   };
 
   this.createKVTableIfNotExist = function(tableName) {
+    var deferred = $q.defer();
+    //TODO: add unique constraint for key
     var sql = 'CREATE TABLE IF NOT EXISTS ' + tableName + ' (key text not null primary key, value text not null);';
-    return dbService.execute(localDB_, sql);
+    dbService.execute(localDB_, sql).then(function() {
+      tables_[tableName] = true;
+      deferred.resolve();
+    }, function(){
+      deferred.reject();
+    });
+    return deferred.promise;
   };
 
-  this.setKey = function(tableName, key, value) {
+  this.setKey = function(tableName, key, value, rejectIfKeyExists) {
     var deferred = $q.defer();
+    if (!tables_.hasOwnProperty(tableName)) {
+      deferred.reject();
+      utilService.notify('localDBService, invalid tableName');
+    }
+
     if (typeof key !== 'string') {
       utilService.notify('localDBService, key must be a string');
       deferred.reject();
@@ -607,21 +684,29 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
           deferred.resolve();
         }, rejected);
       } else if (res.rows.length === 1) {
-        var sql = 'UPDATE ' + tableName + ' SET value=? WHERE key=?;';
-        dbService.execute(localDB_, sql, [value, key]).then(function(res) {
-          deferred.resolve();
-        }, rejected);
+        if (rejectIfKeyExists) {
+          deferred.reject('keyExists');
+        } else {
+          var sql = 'UPDATE ' + tableName + ' SET value=? WHERE key=?;';
+          dbService.execute(localDB_, sql, [value, key]).then(function (res) {
+            deferred.resolve();
+          }, rejected);
+        }
       } else {
         utilService.notify('localDBService.set, Multiple entries for property: ' + key);
         deferred.reject();
       }
     }, rejected);
-
     return deferred.promise;
   };
 
   this.getKey = function(tableName, key, parse) {
     var deferred = $q.defer();
+    if (!tables_.hasOwnProperty(tableName)) {
+      deferred.reject();
+      utilService.notify('localDBService, invalid tableName');
+    }
+
     if (typeof key !== 'string') {
       utilService.notify('localDBService, key must be a string');
       deferred.reject();
@@ -647,7 +732,98 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
         deferred.reject();
       }
     }, rejected);
-
     return deferred.promise;
   };
+
+  this.removeKey = function(tableName, key) {
+    var deferred = $q.defer();
+    if (!tables_.hasOwnProperty(tableName)) {
+      deferred.reject();
+      utilService.notify('localDBService, invalid tableName');
+    }
+
+    if (typeof key !== 'string') {
+      utilService.notify('localDBService.removeKey, key must be a string');
+      deferred.reject();
+    }
+
+    var rejected = function() {
+      utilService.notify('localDBService.removeKey, error. key: ' + key);
+      deferred.reject();
+    };
+
+    var sql = 'DELETE from ' + tableName + ' WHERE key=?;';
+    dbService.execute(localDB_, sql, [key]).then(function(res) {
+      console.log(res);
+      alert('check console for delete');
+      if (res.rows.length === 0) {
+        deferred.reject();
+      } else if (res.rows.length === 1) {
+        deferred.resolve(res.rows.length);
+      } else {
+        utilService.notify('localDBService.removeKey, more than 1 row affected for key: ' + key);
+        deferred.reject();
+      }
+    }, rejected);
+    return deferred.promise;
+  };
+
+  // insert value with by generating a unique key that doesn't exist in the table.
+  this.insertValue = function(tableName, value) {
+    var key = utilService.getSHA1(value, true);
+    return service_.setKey(tableName, key, value, /* rejectIfKeyExists */ true);
+  };
+
+  this.getRowsCount = function(tableName) {
+    var deferred = $q.defer();
+    if (!tables_.hasOwnProperty(tableName)) {
+      deferred.reject();
+      utilService.notify('localDBService, invalid tableName');
+    }
+    var sql = 'SELECT count(*) FROM ' + tableName + ';';
+    dbService.execute(localDB_, sql, []).then(function(res) {
+      deferred.resolve(res.rows.item(0)['count(*)']);
+    }, function() {
+      utilService.notify('localDBService.countRows, error. tableName: ' + tableName);
+      deferred.reject();
+    });
+    return deferred.promise;
+  };
+
+  this.getAllRows = function(tableName) {
+    var deferred = $q.defer();
+    if (!tables_.hasOwnProperty(tableName)) {
+      deferred.reject();
+      utilService.notify('localDBService, invalid tableName');
+    }
+    var sql = 'SELECT * FROM ' + tableName + ';';
+    dbService.execute(localDB_, sql, []).then(function(res) {
+      deferred.resolve(res);
+    }, function() {
+      utilService.notify('localDBService.getAllRows, error. tableName: ' + tableName);
+      deferred.reject();
+    });
+    return deferred.promise;
+  };
+
+  this.getAllRowsValues = function(result, parse) {
+    var arr = [];
+    for (var i = 0; i < result.rows.length; i++){
+      if (parse) {
+        arr.push(JSON.parse(result.rows.item(i).value));
+      } else {
+        arr.push(result.rows.item(i).value);
+      }
+    }
+    return arr;
+  };
+
+  this.getAllRowsKeys = function(result) {
+    var arr = [];
+    for (var i = 0; i < result.rows.length; i++){
+      arr.push(result.rows.item(i).key);
+    }
+    return arr;
+  };
+
 });

@@ -49,6 +49,7 @@ angular.module('vida', ['ionic', 'ngCordova', 'vida.directives', 'vida.controlle
 
         localDBService.createKVTableIfNotExist('reports');
         localDBService.createKVTableIfNotExist('forms');
+        localDBService.createKVTableIfNotExist('media');
       }
 
       if (!(navigator.camera)){

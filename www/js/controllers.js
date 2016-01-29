@@ -174,7 +174,7 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
 
 .controller('TrackingCtrl', function($scope, $location, configService,
                                      $translate, $interval, geolocationService, trackerService,
-                                     $filter, $timeout){
+                                     $filter, $timeout, $cordovaToast){
     console.log('---------------------------------- TrackingCtrl');
     $scope.tracking = false;
     $scope.trackingInterval = null;
@@ -235,11 +235,7 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
       });
     }, function (reason) {
       $scope.isLoading = false;
-      $cordovaToast.showShortBottom($filter('translate')('dialog_error_username'));
-      $ionicLoading.show({
-        template: 'Cannot obtain current location. ' + reason,
-        duration: 1000
-      });
+      $cordovaToast.showShortBottom('Cannot obtain current location. ' + reason);
       $scope.trackingInterval = null;
       $scope.trackingScheduleNext();
     });
@@ -292,7 +288,8 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
   };
 })
 
-.controller('ReportCreateCtrl', function($scope, $rootScope, $stateParams, formService, $cordovaToast, $filter){
+.controller('ReportCreateCtrl', function($scope, $rootScope, $stateParams, formService, $cordovaToast, $filter,
+                                         localDBService, utilService, uploadService){
   console.log("---- ReportCreateCtrl");
   $scope.lastSuccess = null;
   $scope.isLoading = false;
@@ -300,28 +297,48 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
   $scope.sync = function() {
     if (!$scope.isLoading) {
       $scope.isLoading = true;
+
       formService.getAll().then(function (forms) {
         console.log("---- got all forms: ", forms);
         for (var i = 0; i < forms.length; i++) {
           forms[i].schema = JSON.parse(forms[i].schema);
         }
-
         $rootScope.forms = forms;
-        $scope.lastSuccess = new Date();
-        $scope.isLoading = false;
-      }, function() {
-        console.log("---- sync, error");
-        $cordovaToast.showShortBottom(($filter('translate')('error_server_not_found')));
-        $scope.isLoading = false;
+
+        localDBService.getAllRows('reports').then(function (result) {
+          var reports = localDBService.getAllRowsValues(result, true);
+          utilService.foreachWaitForCompletionAsync(reports, uploadService.uploadReport).then(function () {
+            localDBService.getAllRows('media').then(function (result) {
+              var filePaths = localDBService.getAllRowsValues(result);
+              utilService.foreachWaitForCompletionSync(filePaths, uploadService.uploadMedia).then(function () {
+                $cordovaToast.showShortBottom('DONE syncing to server!!');
+              }, function () {
+                utilService.notify('aaaaaaa');
+              });
+            }, function () {
+              utilService.notify('bbbbbb');
+            });
+          }, function () {
+            utilService.notify('ccccc');
+          });
+
+          $scope.lastSuccess = new Date();
+          $scope.isLoading = false;
+        }, function () {
+          console.log("---- sync, error");
+          $cordovaToast.showShortBottom(($filter('translate')('error_server_not_found')));
+          $scope.isLoading = false;
+        });
+      }, function () {
+        utilService.notify('ccccc');
       });
     }
-  };
-
-  $scope.sync();
+  }
 })
 
 .controller('ReportDetailCtrl', function($scope, $rootScope, $stateParams, $cordovaActionSheet, $cordovaCamera, $filter,
-                                         $ionicLoading, uploadService, utilService, $cordovaProgress){
+                                         $ionicLoading, uploadService, utilService, localDBService, geolocationService,
+                                         $cordovaToast, $cordovaProgress, $q, $state){
   console.log("---- ReportDetailCtrl");
   $scope.form = $rootScope.forms[$stateParams.reportId];
   $scope.report = {};
@@ -334,9 +351,7 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
     }
 
     utilService.getFileAsBinaryString(filePath, false).then( function(result) {
-      var fileSha1 = new jsSHA("SHA-1", "BYTES");
-      fileSha1.update(result);
-      filenameSha1 = fileSha1.getHash("HEX") + '.jpg';
+      var filenameSha1 = utilService.getSHA1(result) + '.jpg';
       $scope.mediaPendingUploadMap[filenameSha1] = filePath;
       $scope.report[$scope.getMediaPropName()].push(filenameSha1);
       console.log('----[ filenameSha1: ', filenameSha1);
@@ -347,17 +362,38 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
 
   $scope.save = function() {
     console.log('----[ save: ', $scope.report);
-    $cordovaProgress.showSimpleWithLabelDetail(true, "Saving", "Uploading Report");
-    uploadService.uploadReport($scope.report, $scope.form.resource_uri).then(function() {
-      $cordovaProgress.hide();
-      $cordovaProgress.showSimpleWithLabelDetail(true, "Saving", "Uploading Media");
-      var vals = [];
-      for (var key in $scope.mediaPendingUploadMap) {
-        vals.push($scope.mediaPendingUploadMap[key]);
-      }
-      uploadService.uploadMediaArray(vals).then(function(filePathsFailed, filePathsSucceededFileNames){
-        console.log('uploadMediaArray completed. original: ', vals, ', fails: ', filePathsFailed, ', succeess: ', filePathsSucceededFileNames);
-        $cordovaProgress.hide();
+
+    $cordovaProgress.showSimpleWithLabelDetail(true, "Saving", "Saving report to local DB");
+    geolocationService.getCurrentPosition().then(function(position) {
+      var payload = {
+        "timestamp_local": new Date(),   // help make the object and hense the hash unique
+        "data": $scope.report,
+        "geom": geolocationService.positionToWKT(position),
+        "form": $scope.form.resource_uri
+      };
+
+      localDBService.insertValue('reports', payload).then(function() {
+        localDBService.getRowsCount('reports').then(function(count) {
+          $rootScope.pendingReportsCount = count;
+
+          //TODO: implement foreachWaitForCompletionAsync such that it can call setKey and pass all arguments to it
+          var promises = [];
+          for (var key in $scope.mediaPendingUploadMap) {
+            promises.push(localDBService.setKey('media', key, $scope.mediaPendingUploadMap[key], false));
+          }
+          $q.all(promises).then(function() {
+            $scope.mediaPendingUploadMap = {};
+            $cordovaProgress.hide();
+            utilService.notify("Report saved to local db");
+            $state.go('vida.report-create');
+          },
+          function(){
+            utilService.notify("failed to save media to local db: " + key);
+            $cordovaProgress.hide();
+          });
+        }, function() {
+          $cordovaProgress.hide();
+        });
       });
     });
   };
