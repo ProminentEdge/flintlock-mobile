@@ -47,8 +47,8 @@ angular.module('vida', ['ionic', 'ngCordova', 'vida.directives', 'vida.controlle
           $cordovaToast.showLongTop('config loaded');
         });
 
-        localDBService.createKVTableIfNotExist('reports');
         localDBService.createKVTableIfNotExist('forms');
+        localDBService.createKVTableIfNotExist('reports');
         localDBService.createKVTableIfNotExist('media');
       }
 
@@ -208,7 +208,7 @@ angular.module('vida', ['ionic', 'ngCordova', 'vida.directives', 'vida.controlle
   });
 
   // if none of the above states are matched, use this as the fallback
-  $urlRouterProvider.otherwise('/vida/tracking');
+  $urlRouterProvider.otherwise('/vida/report-create');
 })
 
 .config(['$translateProvider', function ($translateProvider) {

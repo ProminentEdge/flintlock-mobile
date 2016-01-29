@@ -113,7 +113,8 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
   console.log('---------------------------------- ShelterSearchCtrl');
 })
 
-.controller('SettingsCtrl', function($scope, $location, configService, $translate, $cordovaOauth){
+.controller('SettingsCtrl', function($scope, $location, configService, $translate, $cordovaOauth, $ionicPopup,
+                                     localDBService, $rootScope, $cordovaToast){
   console.log('---------------------------------- SettingsCtrl');
 
   $scope.networkAddr = configService.getServerAddress();
@@ -170,6 +171,36 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
 
     configService.setLanguage(this.current_language.value);
   };
+
+  $scope.resetDB = function() {
+    $ionicPopup.confirm({
+      title: 'Reset Database',
+      template: 'All pending reports and media will be reset. Continue?'
+    }).then(function(res) {
+      if (res) {
+        localDBService.removeAllKeys('reports').then(function(){
+          localDBService.removeAllKeys('media').then(function(){
+            localDBService.getRowsCount('reports').then(function(count) {
+              $rootScope.pendingReportsCount = count;
+              $cordovaToast.showShortBottom('Reports and media were reset');
+            });
+          });
+        });
+      }
+    });
+  };
+
+  $scope.dumpDB = function() {
+    localDBService.getAllRows('reports').then(function(res) {
+      console.log('reports, keys: ', localDBService.getAllRowsKeys(res));
+      console.log('reports, values: ', localDBService.getAllRowsValues(res, true));
+    });
+    localDBService.getAllRows('media').then(function(res) {
+      console.log('media, keys: ', localDBService.getAllRowsKeys(res));
+      console.log('media, values: ', localDBService.getAllRowsValues(res));
+    });
+  };
+
 })
 
 .controller('TrackingCtrl', function($scope, $location, configService,
@@ -288,7 +319,7 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
   };
 })
 
-.controller('ReportCreateCtrl', function($scope, $rootScope, $stateParams, formService, $cordovaToast, $filter,
+.controller('ReportCreateCtrl', function($scope, $rootScope, $q, $stateParams, formService, $cordovaToast, $filter,
                                          localDBService, utilService, uploadService){
   console.log("---- ReportCreateCtrl");
   $scope.lastSuccess = null;
@@ -298,39 +329,78 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
     if (!$scope.isLoading) {
       $scope.isLoading = true;
 
-      formService.getAll().then(function (forms) {
+      var rejected = function() {
+        utilService.notify('sync failed.');
+      };
+
+      formService.getAll().then(function(forms) {
+        //-- pull forms
         console.log("---- got all forms: ", forms);
         for (var i = 0; i < forms.length; i++) {
           forms[i].schema = JSON.parse(forms[i].schema);
         }
         $rootScope.forms = forms;
 
-        localDBService.getAllRows('reports').then(function (result) {
+        //-- push reports
+        localDBService.getAllRows('reports').then(function(result) {
           var reports = localDBService.getAllRowsValues(result, true);
-          utilService.foreachWaitForCompletionAsync(reports, uploadService.uploadReport).then(function () {
-            localDBService.getAllRows('media').then(function (result) {
-              var filePaths = localDBService.getAllRowsValues(result);
-              utilService.foreachWaitForCompletionSync(filePaths, uploadService.uploadMedia).then(function () {
-                $cordovaToast.showShortBottom('DONE syncing to server!!');
+          var reportsKeys = localDBService.getAllRowsKeys(result);
+          utilService.foreachWaitForCompletionAsync(reports, uploadService.uploadReport).then(function() {
+            //TODO: use instead promises = reportsKeys.map(localDBService.removeKey.bind(null, 'reports'))
+            //-- remove pushed reports from local db
+            var promises = [];
+            for (var index in reportsKeys) {
+              promises.push(localDBService.removeKey('reports', reportsKeys[index]));
+            }
+            $q.all(promises).then(function() {
+              //-- push media
+              localDBService.getAllRows('media').then(function (result) {
+                var filePaths = localDBService.getAllRowsValues(result);
+                var filePathsKeys = localDBService.getAllRowsKeys(result);
+                // upload pics one at a time ("Sync") to be bandwidth conscious
+                utilService.foreachWaitForCompletionSync(filePaths, uploadService.uploadMedia).then(function() {
+                  //-- removed pushed media from local db
+                  var promises = [];
+                  for (var index in filePathsKeys) {
+                    promises.push(localDBService.removeKey('media', filePathsKeys[index]));
+                  }
+                  $q.all(promises).then(function() {
+                    //-- update badge for pending reports
+                    localDBService.getRowsCount('reports').then(function(count) {
+                      $rootScope.pendingReportsCount = count;
+                      $scope.lastSuccess = new Date();
+                      $scope.isLoading = false;
+                      utilService.notify('Sync Completed.');
+                    });
+                  },
+                  function(){
+                    utilService.notify('failed to remove pushed media');
+                    $scope.isLoading = false;
+                  });
+                }, function () {
+                  utilService.notify('failed to push media');
+                  $scope.isLoading = false;
+                });
               }, function () {
-                utilService.notify('aaaaaaa');
+                utilService.notify('failed to get media from local db');
+                $scope.isLoading = false;
               });
-            }, function () {
-              utilService.notify('bbbbbb');
+            }, function(){
+              utilService.notify("failed to remove pushed reports");
+              $scope.isLoading = false;
             });
           }, function () {
-            utilService.notify('ccccc');
+            utilService.notify('failed to push reports');
+            $scope.isLoading = false;
           });
-
-          $scope.lastSuccess = new Date();
-          $scope.isLoading = false;
         }, function () {
           console.log("---- sync, error");
           $cordovaToast.showShortBottom(($filter('translate')('error_server_not_found')));
           $scope.isLoading = false;
         });
       }, function () {
-        utilService.notify('ccccc');
+        utilService.notify('gggggg');
+        $scope.isLoading = false;
       });
     }
   }

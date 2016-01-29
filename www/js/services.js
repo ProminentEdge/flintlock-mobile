@@ -172,6 +172,9 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
   //Note: $q.all does this but need the sync version
   this.foreachWaitForCompletionAsync = function(array, operation) {
     var deferred = $q.defer();
+    if (array.length === 0) {
+      deferred.resolve();
+    }
     var completed = 0;
     for (var key in array) {
       operation(array[key]).then(function(){
@@ -655,6 +658,18 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
     return deferred.promise;
   };
 
+  this.createKVTableRemove = function(tableName) {
+    var deferred = $q.defer();
+    var sql = 'DROP TABLE ' + tableName + ';';
+    dbService.execute(localDB_, sql).then(function() {
+      delete tables_[tableName];
+      deferred.resolve();
+    }, function(){
+      deferred.reject();
+    });
+    return deferred.promise;
+  };
+
   this.setKey = function(tableName, key, value, rejectIfKeyExists) {
     var deferred = $q.defer();
     if (!tables_.hasOwnProperty(tableName)) {
@@ -755,15 +770,34 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
     var sql = 'DELETE from ' + tableName + ' WHERE key=?;';
     dbService.execute(localDB_, sql, [key]).then(function(res) {
       console.log(res);
-      alert('check console for delete');
-      if (res.rows.length === 0) {
+      if (res.rowsAffected === 0) {
         deferred.reject();
-      } else if (res.rows.length === 1) {
-        deferred.resolve(res.rows.length);
+      } else if (res.rowsAffected === 1) {
+        deferred.resolve();
       } else {
-        utilService.notify('localDBService.removeKey, more than 1 row affected for key: ' + key);
+        utilService.notify('localDBService.removeKey, more than 1 row affected for key: ' + key + ', count: ' + res.rowsAffected);
         deferred.reject();
       }
+    }, rejected);
+    return deferred.promise;
+  };
+
+  this.removeAllKeys = function(tableName) {
+    var deferred = $q.defer();
+    if (!tables_.hasOwnProperty(tableName)) {
+      deferred.reject();
+      utilService.notify('localDBService, invalid tableName');
+    }
+
+    var rejected = function() {
+      utilService.notify('localDBService.removeAllKeys, error');
+      deferred.reject();
+    };
+
+    var sql = 'DELETE from ' + tableName + ';';
+    dbService.execute(localDB_, sql, []).then(function(res) {
+      console.log(res);
+      deferred.resolve();
     }, rejected);
     return deferred.promise;
   };
