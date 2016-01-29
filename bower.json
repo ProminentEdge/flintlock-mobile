@@ -15,5 +15,8 @@
     "angular-moment": "~0.10.3",
     "moment": "~2.11.1",
     "jsSHA": "2.0.2"
+  },
+  "resolutions": {
+    "moment": ">=2.8.0 <2.11.0"
   }
 }

@@ -113,7 +113,7 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
   console.log('---------------------------------- ShelterSearchCtrl');
 })
 
-.controller('SettingsCtrl', function($scope, $location, configService, $translate, $cordovaOauth, $ionicPopup,
+.controller('SettingsCtrl', function($scope, $location, configService, $translate, ngCordovaOauth, $ionicPopup,
                                      localDBService, $rootScope, $cordovaToast){
   console.log('---------------------------------- SettingsCtrl');
 
