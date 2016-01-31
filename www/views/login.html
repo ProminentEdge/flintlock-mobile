@@ -10,18 +10,18 @@
       <ion-list>
         <label class="item item-input">
           <span class="input-label">{{'login_username' | translate}}</span>
-          <input type="text" placeholder="" ng-model="username"
+          <input type="text" placeholder="" ng-model="configService.getConfig().username"
                  autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
         </label>
         <label class="item item-input">
           <span class="input-label">{{'login_password' | translate}}</span>
-          <input type="password" placeholder="" ng-model="password"
+          <input type="password" placeholder="" ng-model="configService.getConfig().password"
                  autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
         </label>
       </ion-list>
 
-      <button class="button button-positive button-block" ng-click="login('/tabs')">{{'button_login' | translate}}</button>
-      <a href="" class="button button-positive button-clear button-block" ng-click="saveCredentialsWithoutVerification('/tabs')">{{'button_save_credentials_without_verification' | translate}}</a>
+      <button class="button button-positive button-block" ng-click="login('/tabs', true)">{{'button_login' | translate}}</button>
+      <a href="" class="button button-positive button-clear button-block" ng-click="login('/tabs', false)">{{'button_save_credentials_without_verification' | translate}}</a>
     </form>
   </ion-content>
 </ion-view>

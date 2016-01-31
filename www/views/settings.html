@@ -5,14 +5,15 @@
         <div>
           <label class="item item-input">
             <span class="input-label">{{'settings_server_ip' | translate}}:</span>
-            <input type="text" placeholder="" ng-model-options='{debounce: 2000}' ng-change="saveServerAddress(networkAddr)" ng-model="networkAddr">
+            <input type="text" placeholder="" ng-model-options='{debounce: 2000}' ng-change="configService.saveConfig()" ng-model="configService.getConfig().serverURL">
           </label>
         </div>
 
         <label class="item item-input item-select">
           <span class="input-label">{{'settings_language' | translate}}</span>
-          <select ng-init="current_language == current_language || language_options[0]" ng-change="switchLanguage()"
-                  ng-model="current_language"
+          <select ng-change="switchLanguage()"
+                  ng-init="configService.getConfig().language=language_options[0]"
+                  ng-model="configService.getConfig().language"
                   ng-options="option.name | translate for option in language_options">
           </select>
         </label>
@@ -21,7 +22,7 @@
 
         <label class="item item-input">
           <span class="input-label">Username </span>
-          <input type="text" ng-disabled="true" ng-model="username">
+          <input type="text" ng-disabled="true" ng-model="configService.getConfig().username">
         </label>
         <button class="button button-positive button-block" ng-click="logout('/login')">{{'button_change_credentials' | translate}}</button>
 

@@ -31,9 +31,8 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
 })
 
 .config(function($interpolateProvider, $httpProvider, $resourceProvider) {
-//  $interpolateProvider.startSymbol('{[');
-//  $interpolateProvider.endSymbol(']}');
-
+  //$interpolateProvider.startSymbol('{[');
+  //$interpolateProvider.endSymbol(']}');
   //$httpProvider.defaults.xsrfCookieName = 'csrftoken';
   //$httpProvider.defaults.xsrfHeaderName = 'X-CSRFToken';
   //$httpProvider.interceptors.push('httpRequestInterceptor');
@@ -291,7 +290,6 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
 .service('loginService', function($http, $q, configService, $cordovaToast, $filter) {
   this.login = function (username, password) {
     var deferred = $q.defer();
-    configService.setAuthentication(username, password);
     $http.get(configService.getAuthenticationURL(),
       {
         "headers": {
@@ -334,7 +332,6 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
 
   this.loginAjax = function (username, password) {
     var deferred = $q.defer();
-    configService.setAuthentication(username, password);
 
     $.ajax({
       type: 'GET',
@@ -525,20 +522,20 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
 
   // when the application is first installed & launched, these settings will be used.
   var initialConfig_ = {
-    serverURL: "192.168.33.15",
-    username: "admin",
-    password: "admin",
-    protocol: "http",
-    language: "English",
-    workOffline: "false"
+    serverURL: '192.168.33.15',
+    username: 'admin',
+    password: 'admin',
+    protocol: 'http',
+    language: {
+      'name': 'settings_language_english',
+      'value': 'English'
+    },
+    syncLastSuccess: null,
+    trackingLastSuccess: null
   };
 
   // the current config. Often has been modified by user and loaded from db
   var config_ = null;
-
-  this.getInitialConfig = function() {
-    return initialConfig_;
-  };
 
   this.loadConfig = function() {
     var deferred = $q.defer();
@@ -559,13 +556,9 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
     });
   };
 
-  this.getServerAddress = function() {
-    return config_.serverURL;
-  };
-
-  this.setServerAddress = function(address) {
-    config_.serverURL = address;
-    service_.saveConfig();
+  // watch and auto-save?
+  this.getConfig = function() {
+    return config_;
   };
 
   this.getBasicAuthentication = function() {
@@ -578,29 +571,6 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
         "Authorization": service_.getBasicAuthentication()
       }
     };
-  };
-
-  this.setAuthentication = function(username, password) {
-    config_.username = username;
-    config_.password = password;
-    service_.saveConfig();
-  };
-
-  this.getUsername = function() {
-    return config_.username;
-  };
-
-  this.getPassword = function() {
-    return config_.password;
-  };
-
-  this.getLanguage = function() {
-    return config_.language;
-  };
-
-  this.setLanguage = function(language) {
-    config_.language = language;
-    service_.saveConfig();
   };
 
   this.getTrackURL = function() {

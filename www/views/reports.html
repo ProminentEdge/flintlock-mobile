@@ -8,8 +8,9 @@
       <div class="item item-icon-left" ng-click="sync()">
         <i class="icon ion-android-sync" ng-show="!isLoading" ng-click="sync()"></i>
         <ion-spinner class="icon" icon="spiral" ng-show="isLoading"></ion-spinner>
-        <span>Last Success</span>
-        <span am-time-ago="lastSuccess"></span>
+        <span ng-if="configService.getConfig().syncLastSuccess">Last Sync</span>
+        <span ng-if="configService.getConfig().syncLastSuccess" am-time-ago="configService.getConfig().syncLastSuccess"></span>
+        <span ng-if="!configService.getConfig().syncLastSuccess">Click here to sync!</span>
       </div>
       <div class="item item-icon-left" ng-if="pendingReportsCount>0" ng-click="sync()">
         <i class="icon ion-clipboard"></i>
