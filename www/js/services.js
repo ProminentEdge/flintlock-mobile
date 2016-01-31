@@ -377,15 +377,13 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
   };
 })
 
-.service('formService', function($http, configService, $resource) {
-  var service = this;
-  var forms = [];
-  var current_form = {};
-  current_form.str = 'None';
-  current_form.link = 'None';
+.service('formService', function($http, $q, configService, $resource, localDBService) {
+  var service_ = this;
+  var forms_ = [];
+  var currentForm_ = null;
 
-  this.getAll = function() {
-    var form = $resource(configService.getFormURL() + ':id', {}, {
+  this.pullFroms = function() {
+    var formResource = $resource(configService.getFormURL() + ':id', {}, {
       query: {
         method: 'GET',
         headers: {
@@ -395,36 +393,67 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
         isArray: true,
         transformResponse: $http.defaults.transformResponse.concat([
           function (data, headersGetter) {
-            forms = data.objects;
+            service_.setForms(data.objects, true);
             return data.objects;
           }
         ])
       }
     });
 
-    return form.query().$promise;
+    return formResource.query().$promise;
   };
 
   this.getById = function(id) {
-    for(var i = 0; i < forms.length; i++) {
-      if (forms[i].id == id)
-        return forms[i];
+    for(var i = 0; i < forms_.length; i++) {
+      if (forms_[i].id == id)
+        return forms_[i];
     }
   };
 
   this.getCurrentForm = function() {
-    return current_form;
+    return currentForm_;
   };
 
-  this.setCurrentForm = function(form){
-    if (form !== 'None') {
-      current_form.str = form.name;
-      current_form.link = '#/vida/form-detail/' + form.id;
-    } else {
-      current_form.str = 'None';
-      current_form.link = 'None';
-    }
+  this.setCurrentForm = function(id) {
+    currentForm_ = forms_[id];
   };
+
+  this.getForms = function() {
+    return forms_;
+  };
+
+  this.setForms = function(forms) {
+    for (var i = 0; i < forms.length; i++) {
+      var form = forms[i];
+      if (typeof forms[i].schema === 'string') {
+        forms[i].schema = JSON.parse(forms[i].schema);
+      }
+    }
+    forms_ = forms;
+  };
+
+  this.saveForms = function() {
+    var deferred = $q.defer();
+    var promises = [];
+    localDBService.removeAllKeys('forms').then(function() {
+      for (var i = 0; i < forms_.length; i++) {
+        promises.push(localDBService.insertValue('forms', forms_[i]));
+      }
+    });
+    $q.all(promises).then(function(){
+      deferred.resolve();
+    }, function() {
+      deferred.reject();
+    });
+    return deferred.promise;
+  };
+
+  this.loadForms = function() {
+    localDBService.getAllRows('forms').then(function (result) {
+      service_.setForms(localDBService.getAllRowsValues(result, true), false);
+    });
+  }
+
 })
 
 .service('shelterService', function($http, configService, $resource, $q) {

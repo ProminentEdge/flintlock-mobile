@@ -3,7 +3,7 @@
     <form>
       <div class="item item-input" ng-class="{'item-select': prop.enum}"
            ng-if="propName !== 'photos'"
-           ng-repeat="(propName, prop) in form.schema.properties">
+           ng-repeat="(propName, prop) in formService.getCurrentForm().schema.properties">
         <span class="input-label">{{propName}}:</span>
 
         <a ng-if="prop.description" class="button button-icon ion-ios-information-outline"

@@ -199,6 +199,10 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
       console.log('media, keys: ', localDBService.getAllRowsKeys(res));
       console.log('media, values: ', localDBService.getAllRowsValues(res));
     });
+    localDBService.getAllRows('forms').then(function(res) {
+      console.log('forms, keys: ', localDBService.getAllRowsKeys(res));
+      console.log('forms, values: ', localDBService.getAllRowsValues(res));
+    });
   };
 
 })
@@ -320,10 +324,11 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
 })
 
 .controller('ReportCreateCtrl', function($scope, $rootScope, $q, $stateParams, formService, $cordovaToast, $filter,
-                                         localDBService, utilService, uploadService){
+                                         localDBService, utilService, uploadService, $timeout){
   console.log("---- ReportCreateCtrl");
   $scope.lastSuccess = null;
   $scope.isLoading = false;
+  $scope.formService = formService;
 
   $scope.sync = function() {
     if (!$scope.isLoading) {
@@ -333,73 +338,72 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
         utilService.notify('sync failed.');
       };
 
-      formService.getAll().then(function(forms) {
-        //-- pull forms
-        console.log("---- got all forms: ", forms);
-        for (var i = 0; i < forms.length; i++) {
-          forms[i].schema = JSON.parse(forms[i].schema);
-        }
-        $rootScope.forms = forms;
-
-        //-- push reports
-        localDBService.getAllRows('reports').then(function(result) {
-          var reports = localDBService.getAllRowsValues(result, true);
-          var reportsKeys = localDBService.getAllRowsKeys(result);
-          utilService.foreachWaitForCompletionAsync(reports, uploadService.uploadReport).then(function() {
-            //TODO: use instead promises = reportsKeys.map(localDBService.removeKey.bind(null, 'reports'))
-            //-- remove pushed reports from local db
-            var promises = [];
-            for (var index in reportsKeys) {
-              promises.push(localDBService.removeKey('reports', reportsKeys[index]));
-            }
-            $q.all(promises).then(function() {
-              //-- push media
-              localDBService.getAllRows('media').then(function (result) {
-                var filePaths = localDBService.getAllRowsValues(result);
-                var filePathsKeys = localDBService.getAllRowsKeys(result);
-                // upload pics one at a time ("Sync") to be bandwidth conscious
-                utilService.foreachWaitForCompletionSync(filePaths, uploadService.uploadMedia).then(function() {
-                  //-- removed pushed media from local db
-                  var promises = [];
-                  for (var index in filePathsKeys) {
-                    promises.push(localDBService.removeKey('media', filePathsKeys[index]));
-                  }
-                  $q.all(promises).then(function() {
-                    //-- update badge for pending reports
-                    localDBService.getRowsCount('reports').then(function(count) {
-                      $rootScope.pendingReportsCount = count;
-                      $scope.lastSuccess = new Date();
-                      $scope.isLoading = false;
-                      utilService.notify('Sync Completed.');
-                    });
-                  },
-                  function(){
-                    utilService.notify('failed to remove pushed media');
+      //-- pull forms
+      formService.pullFroms().then(function(forms) {
+        //--save forms
+        formService.saveForms().then(function() {
+          //-- push reports
+          localDBService.getAllRows('reports').then(function (result) {
+            var reports = localDBService.getAllRowsValues(result, true);
+            var reportsKeys = localDBService.getAllRowsKeys(result);
+            utilService.foreachWaitForCompletionAsync(reports, uploadService.uploadReport).then(function () {
+              //TODO: use instead promises = reportsKeys.map(localDBService.removeKey.bind(null, 'reports'))
+              //-- remove pushed reports from local db
+              var promises = [];
+              for (var index in reportsKeys) {
+                promises.push(localDBService.removeKey('reports', reportsKeys[index]));
+              }
+              $q.all(promises).then(function () {
+                //-- push media
+                localDBService.getAllRows('media').then(function (result) {
+                  var filePaths = localDBService.getAllRowsValues(result);
+                  var filePathsKeys = localDBService.getAllRowsKeys(result);
+                  // upload pics one at a time ("Sync") to be bandwidth conscious
+                  utilService.foreachWaitForCompletionSync(filePaths, uploadService.uploadMedia).then(function () {
+                    //-- removed pushed media from local db
+                    var promises = [];
+                    for (var index in filePathsKeys) {
+                      promises.push(localDBService.removeKey('media', filePathsKeys[index]));
+                    }
+                    $q.all(promises).then(function () {
+                        //-- update badge for pending reports
+                        localDBService.getRowsCount('reports').then(function (count) {
+                          $rootScope.pendingReportsCount = count;
+                          $scope.lastSuccess = new Date();
+                          $scope.isLoading = false;
+                          utilService.notify('Sync Completed.');
+                        });
+                      },
+                      function () {
+                        utilService.notify('failed to remove pushed media');
+                        $scope.isLoading = false;
+                      });
+                  }, function () {
+                    utilService.notify('failed to push media');
                     $scope.isLoading = false;
                   });
                 }, function () {
-                  utilService.notify('failed to push media');
+                  utilService.notify('failed to get media from local db');
                   $scope.isLoading = false;
                 });
               }, function () {
-                utilService.notify('failed to get media from local db');
+                utilService.notify("failed to remove pushed reports");
                 $scope.isLoading = false;
               });
-            }, function(){
-              utilService.notify("failed to remove pushed reports");
+            }, function () {
+              utilService.notify('failed to push reports');
               $scope.isLoading = false;
             });
           }, function () {
-            utilService.notify('failed to push reports');
+            console.log("---- sync, error");
+            $cordovaToast.showShortBottom(($filter('translate')('error_server_not_found')));
             $scope.isLoading = false;
           });
-        }, function () {
-          console.log("---- sync, error");
-          $cordovaToast.showShortBottom(($filter('translate')('error_server_not_found')));
-          $scope.isLoading = false;
-        });
+        }, function() {
+          utilService.notify('failed to remove all existing forms from local db');
+        })
       }, function () {
-        utilService.notify('gggggg');
+        utilService.notify('failed to pull forms');
         $scope.isLoading = false;
       });
     }
@@ -408,11 +412,13 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
 
 .controller('ReportDetailCtrl', function($scope, $rootScope, $stateParams, $cordovaActionSheet, $cordovaCamera, $filter,
                                          $ionicLoading, uploadService, utilService, localDBService, geolocationService,
-                                         $cordovaToast, $cordovaProgress, $q, $state){
+                                         $cordovaToast, $cordovaProgress, $q, $state, formService){
   console.log("---- ReportDetailCtrl");
-  $scope.form = $rootScope.forms[$stateParams.reportId];
+  $scope.formService = formService;
   $scope.report = {};
   $scope.mediaPendingUploadMap = {};
+
+  formService.setCurrentForm($stateParams.reportId);
 
   $scope.addMedia = function(filePath) {
     console.log('----[ addMedia: ', filePath);
@@ -439,7 +445,7 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
         "timestamp_local": new Date(),   // help make the object and hense the hash unique
         "data": $scope.report,
         "geom": geolocationService.positionToWKT(position),
-        "form": $scope.form.resource_uri
+        "form": formService.getCurrentForm().resource_uri
       };
 
       localDBService.insertValue('reports', payload).then(function() {
@@ -481,9 +487,9 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
   };
 
   $scope.getMediaPropName = function() {
-    if ('photos' in $scope.form.schema.properties)
+    if ('photos' in formService.getCurrentForm().schema.properties)
       return 'photos';
-    if ('Photos' in $scope.form.schema.properties)
+    if ('Photos' in formService.getCurrentForm().schema.properties)
       return 'Photos';
   };
 

@@ -10,7 +10,7 @@ var db = null;
 angular.module('vida', ['ionic', 'ngCordova', 'vida.directives', 'vida.controllers', 'vida.services', 'leaflet-directive',
     'pascalprecht.translate', 'vida-translations-en', 'vida-translations-es', 'ngResource', 'angularMoment'])
 
-.run(function($ionicPlatform, $window, $cordovaSQLite, configService, localDBService, $cordovaToast) {
+.run(function($q, $ionicPlatform, $window, $cordovaSQLite, configService, localDBService, $cordovaToast, formService) {
   $ionicPlatform.ready(function() {
     // Hide the accessory bar by default (remove this to show the accessory bar above the keyboard
     // for form inputs).
@@ -41,15 +41,23 @@ angular.module('vida', ['ionic', 'ngCordova', 'vida.directives', 'vida.controlle
 
         // open the local database and load the settings
         localDBService.openLocalDB();
-        // create the tables needed by the app if not already in the db
-        localDBService.createKVTableIfNotExist('properties').then( function() {
-          configService.loadConfig();
-          $cordovaToast.showLongTop('config loaded');
-        });
 
-        localDBService.createKVTableIfNotExist('forms');
-        localDBService.createKVTableIfNotExist('reports');
-        localDBService.createKVTableIfNotExist('media');
+        var promises = [];
+        // create the tables needed by the app if not already in the db
+        promises.push(localDBService.createKVTableIfNotExist('properties'));
+        promises.push(localDBService.createKVTableIfNotExist('forms'));
+        promises.push(localDBService.createKVTableIfNotExist('reports'));
+        promises.push(localDBService.createKVTableIfNotExist('media'));
+
+        $q.all(promises).then(function(){
+          var promises = [];
+          promises.push(configService.loadConfig());
+          promises.push(formService.loadForms());
+          $q.all(promises).then(function(){
+            console.log('Forms: ', formService.getForms());
+            $cordovaToast.showLongTop('config & forms loaded');
+          });
+        });
       }
 
       if (!(navigator.camera)){

@@ -2,6 +2,7 @@
   var translations = {
     'title_tracking': 'Tracking',
     'title_reports': 'Reports',
+    'title_report_create': 'Create Report',
     'title_website': 'Website',
     'title_search': 'Search',
     'title_create': 'Create Person',
