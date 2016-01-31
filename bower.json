@@ -1,5 +1,5 @@
 {
-  "name": "vida-mobile",
+  "name": "flintlock-mobile",
   "private": "true",
   "devDependencies": {
     "ionic": "driftyco/ionic-bower#1.1.0",

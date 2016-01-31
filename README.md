@@ -1,4 +1,4 @@
-# vida-mobile
+# flintlock-mobile
 ---
 ### How to install:
 
@@ -27,8 +27,8 @@ $ npm install -g android-sim
 
 At this point you can build the mobile app:
 ```sh
-git clone https://github.com/ROGUE-JCTD/vida-mobile.git
-cd vida-mobile
+git clone https://github.com/ROGUE-JCTD/flintlock-mobile.git
+cd flintlock-mobile
 ./clean-build.sh
 ```
 Next, run the app in one of the following platforms
@@ -65,7 +65,7 @@ ionic build ios
 ###### Launch on iOS device
 - you need to have a Apple Developer License which costs 99$ per year
 - when you launch xcode, you can log in with your apple account to utilize the license
-- launch platforms/ios/vida-mobile.xcodeproj in xcode
+- launch platforms/ios/flintlock-mobile.xcodeproj in xcode
 - click the "build and then run" (play) button to launch the app on device
 
 ###### Debug
