@@ -244,7 +244,6 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
     console.log('----[ trackingStart');
     if ( $scope.trackingInterval !== null ) return;
     $scope.trackingProcess(); // call immediately and schedule another
-    //$scope.trackingInterval = $interval($scope.trackingProcess, 10000);
   };
 
   $scope.trackingScheduleNext = function() {
@@ -270,7 +269,7 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
     $scope.isLoading = true;
     geolocationService.getCurrentPosition().then(function (position) {
       console.log('Current location found: ', position);
-      trackerService.post(position).then(function(){
+      trackerService.post(position, $scope.mayday.state).then(function(){
         $scope.isLoading = false;
         configService.getConfig().trackinglastSuccess = new Date();
         configService.saveConfig();

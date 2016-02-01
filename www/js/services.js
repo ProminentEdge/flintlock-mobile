@@ -265,14 +265,13 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
 
 
 .service('trackerService', function($http, $q, configService, geolocationService) {
-  this.post = function (position) {
+  this.post = function (position, mayday) {
     var deferred = $q.defer();
 
     var payload = {
-      "entity_type": 1,
-      "force_type": 1,
+      "mayday": mayday,
       "geom": geolocationService.positionToWKT(position),
-      "user": "mobile"
+      "user": configService.getConfig().username
     };
 
     $http.post(configService.getTrackURL(), payload, configService.getAuthenticationHeader()).success(function(data) {
