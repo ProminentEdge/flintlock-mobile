@@ -2,19 +2,28 @@
   <ion-pane>
     <ion-content padding="true" class="has-header">
       <form>
-        <div>
-          <label class="item item-input">
-            <span class="input-label">{{'settings_server_ip' | translate}}:</span>
-            <input type="text" placeholder="" ng-model-options='{debounce: 2000}' ng-change="configService.saveConfig()" ng-model="configService.getConfig().serverURL">
-          </label>
-        </div>
 
         <label class="item item-input item-select">
           <span class="input-label">{{'settings_language' | translate}}</span>
-          <select ng-change="switchLanguage()"
-                  ng-init="configService.getConfig().language=language_options[0]"
+          <select ng-change="switchProtocol()"
+                  ng-init="configService.getConfig().language=languageOptions[0]"
                   ng-model="configService.getConfig().language"
-                  ng-options="option.name | translate for option in language_options">
+                  ng-options="option.name | translate for option in languageOptions">
+          </select>
+        </label>
+
+        <div class="spacer" style="width: 300px; height: 40px;"></div>
+
+        <label class="item item-input">
+          <span class="input-label">{{'settings_server' | translate}}</span>
+          <input type="text" placeholder="app.flintlock.net" ng-model-options='{debounce: 2000}' ng-change="configService.saveConfig()" ng-model="configService.getConfig().serverURL">
+        </label>
+        <label class="item item-input item-select">
+          <span class="input-label">{{'settings_server_protocol' | translate}}</span>
+          <select ng-change="configService.saveConfig()"
+                  ng-init="configService.getConfig().protocol=protocolOptions[0]"
+                  ng-model="configService.getConfig().protocol"
+                  ng-options="option.name | translate for option in protocolOptions">
           </select>
         </label>
 
@@ -25,13 +34,11 @@
           <input type="text" ng-disabled="true" ng-model="configService.getConfig().username">
         </label>
         <button class="button button-positive button-block" ng-click="logout('/login')">{{'button_change_credentials' | translate}}</button>
+        <button class="button button-positive button-block" ng-click="testOauth()">{{'Google Login'}}</button>
 
-        <div class="spacer" style="width: 300px; height: 40px;"></div>
+        <div class="spacer" style="width: 300px; height: 20px;"></div>
         <button class="button button-assertive button-block" ng-click="resetDB()">Reset Database</button>
         <button class="button button-positive button-block" ng-click="dumpDB()">Log Database</button>
-        <!--
-        <button class="button button-positive button-block" ng-click="testOauth()">{{'Test OAuth'}}</button>
-        -->
       </form>
     </ion-content>
   </ion-pane>

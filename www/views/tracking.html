@@ -2,7 +2,8 @@
   <ion-pane>
     <ion-content padding="true" class="has-header">
       <form>
-        <ion-toggle ng-model="tracking" ng-change="trackingChanged()" toggle-class="toggle-positive">{{'tracking' | translate}}</ion-toggle>
+
+        <ion-toggle ng-model="tracking.state" toggle-class="toggle-positive">{{'tracking_toggle' | translate}}</ion-toggle>
         <label class="item item-input item-icon-right">
           <span class="input-label">{{'Last Success'}}</span>
           <span ng-if="configService.getConfig().trackinglastSuccess" class="input-label" am-time-ago="configService.getConfig().trackinglastSuccess"></span>
@@ -10,6 +11,10 @@
 
           <ion-spinner icon="ripple" ng-show="isLoading"></ion-spinner>
         </label>
+
+        <div class="spacer" style="width: 300px; height: 18px;"></div>
+
+        <ion-toggle ng-model="mayday.state" toggle-class="toggle-assertive">{{'tracking_mayday' | translate}}</ion-toggle>
       </form>
     </ion-content>
   </ion-pane>

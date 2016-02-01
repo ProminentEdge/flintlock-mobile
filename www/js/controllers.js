@@ -113,12 +113,12 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
   console.log('---------------------------------- ShelterSearchCtrl');
 })
 
-.controller('SettingsCtrl', function($scope, $location, configService, $translate, /*ngCordovaOauth, */ $ionicPopup,
+.controller('SettingsCtrl', function($scope, $location, configService, $translate, $cordovaOauth, $ionicPopup,
                                      localDBService, $rootScope, $cordovaToast){
   console.log('---------------------------------- SettingsCtrl');
 
   $scope.configService = configService;
-  $scope.language_options = [
+  $scope.languageOptions = [
     {
       "name": 'settings_language_english',
       "value": "English"
@@ -126,6 +126,17 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
     {
       "name": 'settings_language_spanish',
       "value": "Spanish"
+    }
+  ];
+
+  $scope.protocolOptions = [
+    {
+      "name": 'Http',
+      "value": 'http'
+    },
+    {
+      "name": 'Https (SSL)',
+      "value": 'https'
     }
   ];
 
@@ -200,22 +211,34 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
 .controller('TrackingCtrl', function($scope, $location, configService,
                                      $translate, $interval, geolocationService, trackerService,
                                      $filter, $timeout, $cordovaToast){
-    console.log('---------------------------------- TrackingCtrl');
-    $scope.tracking = false;
-    $scope.trackingInterval = null;
-    $scope.configService = configService;
-    $scope.isLoading = false;
+  console.log('---------------------------------- TrackingCtrl');
+  // Note: due to an angular scoping bug, toggle sate needs to be in another object
+  $scope.tracking = { state: false };
+  $scope.mayday = { state: false };
+  $scope.trackingInterval = null;
+  $scope.configService = configService;
+  $scope.isLoading = false;
 
-    $scope.trackingChanged = function() {
-      if ($scope.tracking === false) {
-        $scope.tracking = true;
-        $scope.trackingStart();
-      } else {
-        $scope.tracking = false;
-        $scope.trackingStop();
+  $scope.$watch('mayday.state', function(newVal, oldVal) {
+    console.log('Mayday:, ', newVal, oldVal, $scope.mayday.state);
+    if (newVal !== oldVal) {
+      if (newVal === true) {
+        $scope.tracking.state = true;
       }
-      console.log('tracking: ', $scope.tracking);
-    };
+    }
+  });
+
+  $scope.$watch('tracking.state', function(newVal, oldVal) {
+    console.log('Tracking:, ', newVal, oldVal, $scope.tracking.state);
+    if (newVal !== oldVal) {
+      if (newVal === false) {
+        $scope.mayday.state = false;
+        $scope.trackingStop();
+      } else {
+        $scope.trackingStart();
+      }
+    }
+  });
 
   $scope.trackingStart = function() {
     console.log('----[ trackingStart');

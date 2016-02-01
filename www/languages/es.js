@@ -74,7 +74,7 @@
     'settings_language': 'Idioma',
     'settings_language_english': 'Ingles',
     'settings_language_spanish': 'Espanol',
-    'settings_server_ip': 'Servidor IP',
+    'settings_server': 'Servidor',
     'error_retrieving_info': 'Recuperacion de informacion..',
     'error_wrong_credentials': 'Incorrect Username or Password!',
     'error_connecting_server': 'A problem occurred when connecting to the server. Status: ',

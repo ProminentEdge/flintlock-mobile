@@ -525,7 +525,10 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
     serverURL: '192.168.33.15',
     username: 'admin',
     password: 'admin',
-    protocol: 'http',
+    protocol: {
+      'name': 'Http',
+      'value': 'http'
+    },
     language: {
       'name': 'settings_language_english',
       'value': 'English'
@@ -574,19 +577,19 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
   };
 
   this.getTrackURL = function() {
-    return config_.protocol + '://' + config_.serverURL + '/api/v1/track/';
+    return config_.protocol.value + '://' + config_.serverURL + '/api/v1/track/';
   };
 
   this.getFormURL = function() {
-    return config_.protocol + '://' + config_.serverURL + '/api/v1/form/';
+    return config_.protocol.value + '://' + config_.serverURL + '/api/v1/form/';
   };
 
   this.getReportURL = function() {
-    return config_.protocol + '://' + config_.serverURL + '/api/v1/report/';
+    return config_.protocol.value + '://' + config_.serverURL + '/api/v1/report/';
   };
 
   this.getFileServiceURL = function() {
-    return config_.protocol + '://' + config_.serverURL + '/api/v1/fileservice/';
+    return config_.protocol.value + '://' + config_.serverURL + '/api/v1/fileservice/';
   };
 
   this.getAuthenticationURL = function() {

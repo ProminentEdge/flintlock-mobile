@@ -8,7 +8,7 @@
 // 'vida.services' is found in services.js
 var db = null;
 angular.module('vida', ['ionic', 'ngCordova', 'vida.directives', 'vida.controllers', 'vida.services', 'leaflet-directive',
-    'pascalprecht.translate', 'vida-translations-en', 'vida-translations-es', 'ngResource', 'angularMoment'])
+    'pascalprecht.translate', 'vida-translations-en', 'vida-translations-es', 'ngResource', 'angularMoment', 'ngCordovaOauth'])
 
 .run(function($q, $ionicPlatform, $window, $cordovaSQLite, configService, localDBService, $cordovaToast, formService) {
   $ionicPlatform.ready(function() {
