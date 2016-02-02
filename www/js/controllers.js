@@ -220,7 +220,6 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
   $scope.isLoading = false;
 
   $scope.$watch('mayday.state', function(newVal, oldVal) {
-    console.log('Mayday:, ', newVal, oldVal, $scope.mayday.state);
     if (newVal !== oldVal) {
       if (newVal === true) {
         $scope.tracking.state = true;
@@ -229,7 +228,6 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
   });
 
   $scope.$watch('tracking.state', function(newVal, oldVal) {
-    console.log('Tracking:, ', newVal, oldVal, $scope.tracking.state);
     if (newVal !== oldVal) {
       if (newVal === false) {
         $scope.mayday.state = false;
@@ -247,12 +245,9 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
   };
 
   $scope.trackingScheduleNext = function() {
-    console.log('----[ trackingScheduleNext');
-    if ($scope.tracking) {
+    if ($scope.tracking.state) {
       if ($scope.trackingInterval !== null) return;
       $scope.trackingInterval = $timeout($scope.trackingProcess, 10000);
-    } else {
-      console.log('----[ cannot schedule tracking since traking is off.');
     }
   };
 
@@ -268,7 +263,6 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
     console.log('---[ trackingProcess ');
     $scope.isLoading = true;
     geolocationService.getCurrentPosition().then(function (position) {
-      console.log('Current location found: ', position);
       trackerService.post(position, $scope.mayday.state).then(function(){
         $scope.isLoading = false;
         configService.getConfig().trackinglastSuccess = new Date();
@@ -277,7 +271,7 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
         $scope.trackingScheduleNext();
       }, function(error) {
         $scope.isLoading = false;
-        $cordovaToast.showShortBottom($filter('translate')('dialog_error_username'));
+        $cordovaToast.showShortBottom($filter('translate')('error_sending'));
         $scope.trackingInterval = null;
         $scope.trackingScheduleNext();
       });

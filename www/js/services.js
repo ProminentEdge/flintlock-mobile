@@ -269,13 +269,13 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
     var deferred = $q.defer();
 
     var payload = {
-      "mayday": mayday,
-      "geom": geolocationService.positionToWKT(position),
-      "user": configService.getConfig().username
+      'mayday': mayday,
+      'geom': geolocationService.positionToWKT(position),
+      'user': configService.getConfig().username
     };
 
     $http.post(configService.getTrackURL(), payload, configService.getAuthenticationHeader()).success(function(data) {
-      console.log('----[ trackerService.success: ', data);
+      // console.log('----[ trackerService.success: ', data);
       deferred.resolve();
     }).error(function(error) {
       console.log('----[ trackerService.error: ', error);

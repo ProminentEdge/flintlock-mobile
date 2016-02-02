@@ -92,6 +92,7 @@
     'error_connecting_server': 'A problem occurred when connecting to the server.',
     'error_no_results': 'No results found.',
     'error_couldnt_get_results': 'Could not get results. Please try again.',
+    'error_sending': 'Error Sending',
     'loading_face_search': 'Loading Best Possible Matches..'
   };
 
