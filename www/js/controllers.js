@@ -342,8 +342,11 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
           localDBService.getAllRows('reports').then(function (result) {
             var reports = localDBService.getAllRowsValues(result, true);
             var reportsKeys = localDBService.getAllRowsKeys(result);
-            utilService.foreachWaitForCompletionAsync(reports, uploadService.uploadReport).then(function () {
-              //TODO: use instead promises = reportsKeys.map(localDBService.removeKey.bind(null, 'reports'))
+            var promisesUpload = [];
+            for (var index in reports) {
+              promisesUpload.push(uploadService.uploadReport(reports[index]));
+            }
+            $q.all(promisesUpload).then(function () {
               //-- remove pushed reports from local db
               var promises = [];
               for (var index in reportsKeys) {
@@ -398,13 +401,13 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
           });
         }, function() {
           utilService.notify('failed to remove all existing forms from local db');
-        })
+        });
       }, function () {
         utilService.notify('failed to pull forms');
         $scope.isLoading = false;
       });
     }
-  }
+  };
 })
 
 .controller('ReportDetailCtrl', function($scope, $rootScope, $stateParams, $cordovaActionSheet, $cordovaCamera, $filter,
@@ -640,5 +643,5 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
       }
 
       $state.go('vida.shelter-search');
-    }
+    };
 });

@@ -16,7 +16,7 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
       request: function (config) {
         // if request doesn't have authorization header already, add basic auth
         if (typeof config.headers.Authorization === 'undefined') {
-          config.headers.Authorization = configService.getBasicAuthentication();
+          config.headers.Authorization = configService.getAuthorizationBasicAuth();
         }
 
         // set max timeout since if creds are not valid for endpoint with basic auth, it will go for 90 secs or whatever
@@ -66,7 +66,7 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
     options.fileName = 'filenameWithExtension.jpg';
     options.headers = {
       'Content-Type': undefined,
-      'Authorization': configService.getAuthenticationHeader().headers.Authorization
+      'Authorization': configService.getAuthorizationBasicAuth()
     };
     return $cordovaFileTransfer.upload(configService.getFileServiceURL(), filePath, options);
   };
@@ -100,7 +100,7 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
         service_.uploadMedia(filePaths.slice(-1).pop()).then(function (data) {
           onCompleted(true, data.name);
         }, function (e) {
-          onCompleted(false)
+          onCompleted(false);
         });
       } else {
         // assume success, no failed files and no new filenames
@@ -118,7 +118,7 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
     $http.post(configService.getReportURL(), JSON.stringify(report), {
       transformRequest: angular.identity,
       headers: {
-        'Authorization': configService.getBasicAuthentication()
+        'Authorization': configService.getAuthorizationBasicAuth()
       }
     }).success(function() {
       deferred.resolve();
@@ -168,27 +168,6 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
     return service_.getSHA1(Math.round(Math.random() * Math.pow(2, 48)));
   };
 
-  //Note: $q.all does this but need the sync version
-  this.foreachWaitForCompletionAsync = function(array, operation) {
-    var deferred = $q.defer();
-    if (array.length === 0) {
-      deferred.resolve();
-    }
-    var completed = 0;
-    for (var key in array) {
-      operation(array[key]).then(function(){
-        completed++;
-        if (completed === array.length) {
-          deferred.resolve();
-        }
-      }, function(){
-        alert('operation failed for item in array');
-        deferred.reject();
-      })
-    }
-    return deferred.promise;
-  };
-
   this.foreachWaitForCompletionSync = function(array, operation) {
     if (!array) {
       array = [];
@@ -216,8 +195,8 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
         operation(array.slice(-1).pop()).then(function (data) {
           onCompleted(true, data);
         }, function () {
-          utilService.notify("a media failed to upload, in uploadAnother");
-          onCompleted(false)
+          service_.notify("a media failed to upload, in uploadAnother");
+          onCompleted(false);
         });
       } else {
         // assume success, no failed files and no new filenames
@@ -274,7 +253,11 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
       'user': configService.getConfig().username
     };
 
-    $http.post(configService.getTrackURL(), payload, configService.getAuthenticationHeader()).success(function(data) {
+    $http.post(configService.getTrackURL(), payload, {
+      'headers': {
+        'Authorization': configService.getAuthorizationBasicAuth()
+      }
+    }).success(function(data) {
       // console.log('----[ trackerService.success: ', data);
       deferred.resolve();
     }).error(function(error) {
@@ -293,7 +276,7 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
       {
         "headers": {
           "Content-Type": '',
-          "Authorization": configService.getBasicAuthentication()
+          "Authorization": configService.getAuthorizationBasicAuth()
         },
         "timeout": 3000
       }).then(
@@ -318,8 +301,7 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
           } else if (error.status === 404) {
             $cordovaToast.showShortBottom(($filter('translate')('error_server_not_found')));
           } else {
-            $cordovaToast.showShortBottom($filter('translate')('error_connecting_server') + ', '
-              + error.status + ": " + error.description);
+            $cordovaToast.showShortBottom($filter('translate')('error_connecting_server') + ', ' + error.status + ": " + error.description);
           }
         } else {
           $cordovaToast.showShortBottom($filter('translate')('error_connecting_server'));
@@ -346,7 +328,7 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
 
       "headers": {
         "Content-Type": '',
-        "Authorization": configService.getBasicAuthentication()
+        "Authorization": configService.getAuthorizationBasicAuth()
       }
     }).done(function(data, textStatus, xhr) {
       console.log('----[ ajax.done: ', xhr);
@@ -383,7 +365,7 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
       query: {
         method: 'GET',
         headers: {
-          "Authorization": configService.getBasicAuthentication()
+          "Authorization": configService.getAuthorizationBasicAuth()
         },
         timeout: 10000,
         isArray: true,
@@ -448,8 +430,7 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
     localDBService.getAllRows('forms').then(function (result) {
       service_.setForms(localDBService.getAllRowsValues(result, true), false);
     });
-  }
-
+  };
 })
 
 .service('shelterService', function($http, configService, $resource, $q) {
@@ -524,6 +505,7 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
     serverURL: '192.168.33.15',
     username: 'admin',
     password: 'admin',
+    apiKey: null,
     protocol: {
       'name': 'Http',
       'value': 'http'
@@ -563,16 +545,12 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
     return config_;
   };
 
-  this.getBasicAuthentication = function() {
+  this.getAuthorizationBasicAuth = function() {
     return 'Basic ' + btoa(config_.username + ':' + config_.password);
   };
 
-  this.getAuthenticationHeader = function() {
-    return {
-      "headers": {
-        "Authorization": service_.getBasicAuthentication()
-      }
-    };
+  this.getAuthorizationApiKey = function() {
+    return 'ApiKey ' + config_.username + ':' + config_.apiKey;
   };
 
   this.getTrackURL = function() {
@@ -703,8 +681,8 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
         if (rejectIfKeyExists) {
           deferred.reject('keyExists');
         } else {
-          var sql = 'UPDATE ' + tableName + ' SET value=? WHERE key=?;';
-          dbService.execute(localDB_, sql, [value, key]).then(function (res) {
+          var sqlUpdate = 'UPDATE ' + tableName + ' SET value=? WHERE key=?;';
+          dbService.execute(localDB_, sqlUpdate, [value, key]).then(function (res) {
             deferred.resolve();
           }, rejected);
         }
