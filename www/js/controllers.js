@@ -114,7 +114,8 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
 })
 
 .controller('SettingsCtrl', function($scope, $location, configService, $translate, $cordovaOauth, $ionicPopup,
-                                     localDBService, $rootScope, $cordovaToast){
+                                     localDBService, $rootScope, $cordovaToast, $cordovaInAppBrowser, loginService,
+                                     $http, $state){
   console.log('---------------------------------- SettingsCtrl');
 
   $scope.configService = configService;
@@ -145,14 +146,19 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
     $location.path(url);
   };
 
-  $scope.testOauth = function() {
-    // Can go directly to '/login'
-    console.log('---[ testOauth: ');
+  $scope.deauthorize = function() {
+    configService.resetAuthorizationConfig();
+    configService.saveConfig().then(function(){
+      $state.go('vida.report-create');
+    });
+  };
 
-    $cordovaOauth.google("870172265350-qpj5qtn1vddqqkqpbsjhseifehb4j9g3.apps.googleusercontent.com", ["email"]).then(function(result) {
-      console.log("Response Object -> " + JSON.stringify(result));
-    }, function(error) {
-      console.log("Error -> " + error);
+  $scope.authorize = function() {
+    loginService.loginDjangoGoogleOauth().then(function(){
+      $cordovaToast.showShortBottom('Authorization suceeded');
+      $state.go('vida.report-create');
+    }, function(){
+      console.log('==== authorization failed! ====');
     });
   };
 

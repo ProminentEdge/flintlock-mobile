@@ -12,11 +12,20 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
 
 
 .factory('httpRequestInterceptor', function(configService) {
+  console.log('- - -[ setting access_tocken on request: ', config.access_token);
    return {
       request: function (config) {
+        console.log('---> request intercepted: ', config);
+        // set max timeout since if creds are not valid for endpoint with basic auth, it will go for 90 secs or whatever
+        // the large default is.
+        if (typeof config.access_token === 'undefined') {
+          config.access_token = configService.getConfig().access_token;
+          console.log('- - -[ setting access_tocken on request: ', config.access_token);
+        }
+/*
         // if request doesn't have authorization header already, add basic auth
         if (typeof config.headers.Authorization === 'undefined') {
-          config.headers.Authorization = configService.getAuthorizationBasicAuth();
+          config.headers.Authorization = configService.getAuthorizationApiKey();
         }
 
         // set max timeout since if creds are not valid for endpoint with basic auth, it will go for 90 secs or whatever
@@ -24,7 +33,7 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
         if (typeof config.timeout === 'undefined') {
           config.timeout = 10000;
         }
-
+*/
         return config;
       }
     };
@@ -66,7 +75,7 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
     options.fileName = 'filenameWithExtension.jpg';
     options.headers = {
       'Content-Type': undefined,
-      'Authorization': configService.getAuthorizationBasicAuth()
+      'Authorization': configService.getAuthorizationApiKey()
     };
     return $cordovaFileTransfer.upload(configService.getFileServiceURL(), filePath, options);
   };
@@ -118,7 +127,7 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
     $http.post(configService.getReportURL(), JSON.stringify(report), {
       transformRequest: angular.identity,
       headers: {
-        'Authorization': configService.getAuthorizationBasicAuth()
+        'Authorization': configService.getAuthorizationApiKey()
       }
     }).success(function() {
       deferred.resolve();
@@ -255,7 +264,7 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
 
     $http.post(configService.getTrackURL(), payload, {
       'headers': {
-        'Authorization': configService.getAuthorizationBasicAuth()
+        'Authorization': configService.getAuthorizationApiKey()
       }
     }).success(function(data) {
       // console.log('----[ trackerService.success: ', data);
@@ -269,14 +278,14 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
   };
 })
 
-.service('loginService', function($http, $q, configService, $cordovaToast, $filter) {
+.service('loginService', function($http, $q, configService, $cordovaToast, $filter, $cordovaOauth) {
   this.login = function (username, password) {
     var deferred = $q.defer();
     $http.get(configService.getAuthenticationURL(),
       {
         "headers": {
           "Content-Type": '',
-          "Authorization": configService.getAuthorizationBasicAuth()
+          "Authorization": configService.getAuthorizationApiKey()
         },
         "timeout": 3000
       }).then(
@@ -328,7 +337,7 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
 
       "headers": {
         "Content-Type": '',
-        "Authorization": configService.getAuthorizationBasicAuth()
+        "Authorization": configService.getAuthorizationApiKey()
       }
     }).done(function(data, textStatus, xhr) {
       console.log('----[ ajax.done: ', xhr);
@@ -353,6 +362,35 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
 
     return deferred.promise;
   };
+
+  this.loginDjangoGoogleOauth = function() {
+    var deferred = $q.defer();
+    $cordovaOauth.google(configService.getConfig().google.client_id, configService.getConfig().google.scopes).then(function(result) {
+      console.log("----[ google oauth: ", result);
+      configService.getConfig().google.access_token = result.access_token;
+      $http.get(configService.getAuthenticationURL() , {
+        headers: {
+          access_token: configService.getConfig().access_token
+        }
+      }).then(function(res){
+        console.log('----[ django api key: ', res);
+        configService.getConfig().username = res.data.username;
+        configService.getConfig().django.apikey = res.data.apikey;
+        deferred.resolve();
+        configService.saveConfig();
+      }, function(error) {
+        console.log('====[ error getting django api key: ', error);
+        $cordovaToast.showShortBottom(($filter('translate')('error_could_not_get_django_apikey')));
+        deferred.reject(error);
+      });
+    }, function(error) {
+      console.log("====[ google oauth error: ", error);
+      configService.getConfig().access_token = null;
+      $cordovaToast.showShortBottom('Could not authenticate with google');
+      deferred.reject(error);
+    });
+    return deferred.promise;
+  };
 })
 
 .service('formService', function($http, $q, configService, $resource, localDBService) {
@@ -365,7 +403,7 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
       query: {
         method: 'GET',
         headers: {
-          "Authorization": configService.getAuthorizationBasicAuth()
+          "Authorization": configService.getAuthorizationApiKey()
         },
         timeout: 10000,
         isArray: true,
@@ -502,10 +540,10 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
 
   // when the application is first installed & launched, these settings will be used.
   var initialConfig_ = {
-    serverURL: '192.168.33.15',
-    username: 'admin',
-    password: 'admin',
-    apiKey: null,
+    //serverURL: '192.168.33.15',
+    serverURL: 'flintlock-load-balancer-521350804.eu-central-1.elb.amazonaws.com',
+    username: null,
+    password: null,
     protocol: {
       'name': 'Http',
       'value': 'http'
@@ -515,7 +553,15 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
       'value': 'English'
     },
     syncLastSuccess: null,
-    trackingLastSuccess: null
+    trackingLastSuccess: null,
+    google: {
+      access_token: null,
+      client_id: '904279578897-fct0kbo7e8gaa2me2o39655ceoh71v8d.apps.googleusercontent.com',
+      scopes: ['openid', 'email', 'profile']
+    },
+    django: {
+      apikey: null
+    }
   };
 
   // the current config. Often has been modified by user and loaded from db
@@ -545,12 +591,19 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
     return config_;
   };
 
+  this.resetAuthorizationConfig = function() {
+    var initConfigClone = $.extend({}, initialConfig_);
+    config_.username = initConfigClone.username;
+    config_.google = initConfigClone.google;
+    config_.django = initConfigClone.django;
+  };
+
   this.getAuthorizationBasicAuth = function() {
     return 'Basic ' + btoa(config_.username + ':' + config_.password);
   };
 
   this.getAuthorizationApiKey = function() {
-    return 'ApiKey ' + config_.username + ':' + config_.apiKey;
+    return 'ApiKey ' + config_.username + ':' + config_.apikey;
   };
 
   this.getTrackURL = function() {
@@ -570,7 +623,7 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
   };
 
   this.getAuthenticationURL = function() {
-    return service_.getFormURL();
+    return config_.protocol.value + '://' + config_.serverURL + '/mobile/authorize/';
   };
 
 })
