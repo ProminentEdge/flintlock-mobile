@@ -49,5 +49,10 @@ ionic plugin add https://github.com/brodysoft/Cordova-SQLitePlugin.git
 ionic plugin add https://github.com/an-rahulpandey/cordova-plugin-dbcopy.git
 ionic plugin add https://github.com/pbernasconi/cordova-progressIndicator.git
 ionic plugin add cordova-plugin-geolocation
-ionic plugin add cordova-plugin-inappbrowser
+
+# pegged at 1.1.1 to fix google oauth error on android only where login would complete but browser would give
+# connection refused for http://localhost/callback even though it was correct with the token on it
+# had to walk issues to try to find the problem. should be fixed is a little while:
+# see issue https://github.com/nraboy/ng-cordova-oauth/issues/193
+ionic plugin add cordova-plugin-inappbrowser@1.1.1
 
