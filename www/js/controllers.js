@@ -289,7 +289,6 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
       });
     }, function (reason) {
       $scope.isLoading = false;
-      $cordovaToast.showShortBottom('Cannot obtain current location. ' + reason);
       $scope.trackingInterval = null;
       $scope.trackingScheduleNext();
     });

@@ -11,7 +11,7 @@ function dataURLtoBlob(dataURI) {
 angular.module('vida.services', ['ngCordova', 'ngResource'])
 
 
-.factory('httpRequestInterceptor', function(configService, $q, $cordovaToast, $injector) {
+.factory('httpRequestInterceptor', function(configService, $q, $cordovaToast, utilService, $injector) {
   var interceptor_ = {
     request: function (config) {
       console.log('----[ intercepted: ', config);
@@ -59,8 +59,12 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
     },
 
     responseError: function(rejection) {
-      if (rejection.status == 401) {
-        $cordovaToast.showShortTop('Unauthorized request,responseError');
+      if (rejection.status === 401) {
+        $cordovaToast.showShortTop('Unauthorized, authorize through settings tab');
+      } else if (rejection.status === 404) {
+        $cordovaToast.showShortTop('Server Not Found, check server & protocal');
+      } else if (!utilService.isConnected()) {
+        $cordovaToast.showShortTop('No Connectivity, responseError');
       } else {
         $cordovaToast.showShortTop('Error in response');
       }
@@ -68,7 +72,7 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
     },
 
     response: function (response) {
-      if (response.status == 401) {
+      if (response.status === 401) {
         $cordovaToast.showShortTop('Unauthorized request, response ');
       }
       return response || $q.when(response);
@@ -190,6 +194,24 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
 
 .service('utilService', function($cordovaFile, $q, $cordovaToast) {
   var service_ = this;
+/*
+  var connectionTypeToString_ = {};
+  connectionTypeToString_[Connection.UNKNOWN]  = 'Unknown connection';
+  connectionTypeToString_[Connection.ETHERNET] = 'Ethernet connection';
+  connectionTypeToString_[Connection.WIFI]     = 'WiFi connection';
+  connectionTypeToString_[Connection.CELL_2G]  = 'Cell 2G connection';
+  connectionTypeToString_[Connection.CELL_3G]  = 'Cell 3G connection';
+  connectionTypeToString_[Connection.CELL_4G]  = 'Cell 4G connection';
+  connectionTypeToString_[Connection.CELL]     = 'Cell generic connection';
+  connectionTypeToString_[Connection.NONE]     = 'No network connection';
+
+  this.getConnectionTypeString = function() {
+    return connectionTypeToString_[navigator.connection.type];
+  };
+*/
+  this.isConnected = function() {
+    return navigator.connection.type !== Connection.NONE;
+  };
 
   // given a full file path, get the binary data in the file
   this.getFileAsBinaryString = function(filePath, encodeAsBase64) {
@@ -326,7 +348,7 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
       deferred.resolve();
     }, function(error) {
       console.log('----[ trackerService.error: ', error);
-      utilService.notify('error posting track: ', error);
+      utilService.notify('error posting track ', error);
       deferred.reject(error);
     });
 
@@ -460,7 +482,7 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
         isArray: true,
         transformResponse: $http.defaults.transformResponse.concat([
           function (data, headersGetter) {
-            service_.setForms(data.objects, true);
+            service_.setForms(data.objects);
             return data.objects;
           }
         ])
@@ -490,13 +512,17 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
   };
 
   this.setForms = function(forms) {
-    for (var i = 0; i < forms.length; i++) {
-      var form = forms[i];
-      if (typeof forms[i].schema === 'string') {
-        forms[i].schema = JSON.parse(forms[i].schema);
+    if (typeof forms !== 'undefined' && forms) {
+      for (var i = 0; i < forms.length; i++) {
+        var form = forms[i];
+        if (typeof forms[i].schema === 'string') {
+          forms[i].schema = JSON.parse(forms[i].schema);
+        }
       }
+      forms_ = forms;
+    } else {
+      forms_ = [];
     }
-    forms_ = forms;
   };
 
   this.saveForms = function() {
