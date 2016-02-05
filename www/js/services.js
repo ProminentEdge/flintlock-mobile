@@ -270,7 +270,7 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
 })
 
 
-.factory('geolocationService', function ($q, $timeout) {
+.factory('geolocationService', function ($q, $timeout, utilService) {
   // if call has been made in the past 1 second, don't hit the api
   var currentPositionCache;
 
@@ -284,8 +284,10 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
           $timeout(function () {
             currentPositionCache = undefined;
           }, 1000);
-        }, function () {
-          deferred.reject();
+        }, function(e) {
+          console.log('failed to get geolocation: ', e);
+          utilService.notify('failed to retrieve geolocation.');
+          deferred.reject(e);
         },
         {
           maximumAge: 8000,

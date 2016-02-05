@@ -444,8 +444,10 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
   $scope.save = function() {
     console.log('----[ save: ', $scope.report);
 
-    $cordovaProgress.showSimpleWithLabelDetail(true, "Saving", "Saving report to local DB");
+    $cordovaProgress.showSimpleWithLabelDetail(true, "Saving", "Retrieving gps location");
     geolocationService.getCurrentPosition().then(function(position) {
+      $cordovaProgress.hide();
+      $cordovaProgress.showSimpleWithLabelDetail(true, "Saving", "Saving report to local DB");
       var payload = {
         'timestamp_local': new Date(),   // help make the object and hense the hash unique
         'data': $scope.report,
@@ -483,6 +485,8 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
           $cordovaProgress.hide();
         });
       });
+    }, function() {
+      $cordovaProgress.hide();
     });
   };
 
