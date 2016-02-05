@@ -31,11 +31,11 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
   });
 
   // Create the login modal that we will use later
-  $ionicModal.fromTemplateUrl('views/modal-sample.html', {
-    scope: $scope
-  }).then(function(modal) {
-    $scope.modal = modal;
-  });
+  //$ionicModal.fromTemplateUrl('views/modal-sample.html', {
+  //  scope: $scope
+  //}).then(function(modal) {
+  //  $scope.modal = modal;
+  //});
 
   // Triggered in the login modal to close it
   $scope.cancelModal = function() {
@@ -115,10 +115,12 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
 
 .controller('SettingsCtrl', function($scope, $location, configService, $translate, $cordovaOauth, $ionicPopup,
                                      localDBService, $rootScope, $cordovaToast, $cordovaInAppBrowser, loginService,
-                                     $http, $state){
+                                     $http, $state, reportService){
   console.log('---------------------------------- SettingsCtrl');
 
   $scope.configService = configService;
+  $scope.reportService = reportService;
+
   $scope.languageOptions = [
     {
       "name": 'settings_language_english',
@@ -212,6 +214,11 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
     console.log('current config: ', configService.getConfig());
   };
 
+  $scope.pushMedia = function() {
+    console.log('---------- pushMedia');
+    reportService.pushMedia();
+  }
+
 })
 
 .controller('TrackingCtrl', function($scope, $location, configService,
@@ -269,7 +276,7 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
     console.log('---[ trackingProcess ');
     $scope.isLoading = true;
     geolocationService.getCurrentPosition().then(function (position) {
-      trackerService.post(position, $scope.mayday.state).then(function(){
+      trackerService.push(position, $scope.mayday.state).then(function(){
         $scope.isLoading = false;
         configService.getConfig().trackinglastSuccess = new Date();
         configService.saveConfig();
@@ -277,7 +284,6 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
         $scope.trackingScheduleNext();
       }, function(error) {
         $scope.isLoading = false;
-        $cordovaToast.showShortBottom($filter('translate')('error_sending'));
         $scope.trackingInterval = null;
         $scope.trackingScheduleNext();
       });
@@ -326,7 +332,7 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
 })
 
 .controller('ReportCreateCtrl', function($scope, $rootScope, $q, $stateParams, formService, $cordovaToast, $filter,
-                                         localDBService, utilService, uploadService, configService){
+                                         localDBService, utilService, reportService, configService){
   console.log("---- ReportCreateCtrl");
   $scope.configService = configService;
   $scope.isLoading = false;
@@ -350,7 +356,7 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
             var reportsKeys = localDBService.getAllRowsKeys(result);
             var promisesUpload = [];
             for (var index in reports) {
-              promisesUpload.push(uploadService.uploadReport(reports[index]));
+              promisesUpload.push(reportService.uploadReport(reports[index]));
             }
             $q.all(promisesUpload).then(function () {
               //-- remove pushed reports from local db
@@ -360,44 +366,28 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
               }
               $q.all(promises).then(function () {
                 //-- push media
-                localDBService.getAllRows('media').then(function (result) {
-                  var filePaths = localDBService.getAllRowsValues(result);
-                  var filePathsKeys = localDBService.getAllRowsKeys(result);
-                  // upload pics one at a time ("Sync") to be bandwidth conscious
-                  utilService.foreachWaitForCompletionSync(filePaths, uploadService.uploadMedia).then(function () {
-                    //-- removed pushed media from local db
-                    var promises = [];
-                    for (var index in filePathsKeys) {
-                      promises.push(localDBService.removeKey('media', filePathsKeys[index]));
-                    }
-                    $q.all(promises).then(function () {
-                        //-- update badge for pending reports
-                        localDBService.getRowsCount('reports').then(function (count) {
-                          $rootScope.pendingReportsCount = count;
-                          configService.getConfig().syncLastSuccess = new Date();
-                          configService.saveConfig();
-                          $scope.isLoading = false;
-                          utilService.notify('Sync Completed.');
-                        });
-                      },
-                      function () {
-                        utilService.notify('failed to remove pushed media');
-                        $scope.isLoading = false;
-                      });
-                  }, function () {
-                    utilService.notify('failed to push media');
+                var mediaCompleted = function(){
+                  //-- update badge for pending reports
+                  localDBService.getRowsCount('reports').then(function (count) {
+                    $rootScope.pendingReportsCount = count;
+                    configService.getConfig().syncLastSuccess = new Date();
+                    configService.saveConfig();
                     $scope.isLoading = false;
+                    utilService.notify('Sync Completed.');
                   });
-                }, function () {
-                  utilService.notify('failed to get media from local db');
-                  $scope.isLoading = false;
+                };
+
+                reportService.pushMedia().then(function(){
+                  mediaCompleted();
+                }, function(){
+                  mediaCompleted();
                 });
               }, function () {
                 utilService.notify("failed to remove pushed reports");
                 $scope.isLoading = false;
               });
-            }, function () {
-              utilService.notify('failed to push reports');
+            }, function (e) {
+              utilService.notify('failed to push reports: ' + e);
               $scope.isLoading = false;
             });
           }, function () {
@@ -408,8 +398,13 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
         }, function() {
           utilService.notify('failed to remove all existing forms from local db');
         });
-      }, function () {
-        utilService.notify('failed to pull forms');
+      }, function (e) {
+        console.log('----------------- error: ', e);
+        if (e && e.status === 401){
+          utilService.notify('Please Authorize the app to connect to the server through the settings tab');
+        } else {
+          utilService.notify('failed to pull forms');
+        }
         $scope.isLoading = false;
       });
     }
@@ -417,7 +412,7 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
 })
 
 .controller('ReportDetailCtrl', function($scope, $rootScope, $stateParams, $cordovaActionSheet, $cordovaCamera, $filter,
-                                         $ionicLoading, uploadService, utilService, localDBService, geolocationService,
+                                         $ionicLoading, reportService, utilService, localDBService, geolocationService,
                                          $cordovaToast, $cordovaProgress, $q, $state, formService){
   console.log("---- ReportDetailCtrl");
   $scope.formService = formService;
@@ -428,6 +423,10 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
 
   $scope.addMedia = function(filePath) {
     console.log('----[ addMedia: ', filePath);
+
+    //cordova.file.dataDirectory
+
+
     if (($scope.report[$scope.getMediaPropName()] instanceof Array) === false) {
       $scope.report[$scope.getMediaPropName()] = [];
     }
@@ -448,10 +447,17 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
     $cordovaProgress.showSimpleWithLabelDetail(true, "Saving", "Saving report to local DB");
     geolocationService.getCurrentPosition().then(function(position) {
       var payload = {
-        "timestamp_local": new Date(),   // help make the object and hense the hash unique
-        "data": $scope.report,
-        "geom": geolocationService.positionToWKT(position),
-        "form": formService.getCurrentForm().resource_uri
+        'timestamp_local': new Date(),   // help make the object and hense the hash unique
+        'data': $scope.report,
+        'status': 'SUBMITTED',
+        'geom': {
+          'coordinates': [
+            position.coords.longitude,
+            position.coords.latitude
+          ],
+          'type': 'Point'
+        },
+        'form': formService.getCurrentForm().resource_uri
       };
 
       localDBService.insertValue('reports', payload).then(function() {

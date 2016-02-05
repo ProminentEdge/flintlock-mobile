@@ -11,40 +11,79 @@ function dataURLtoBlob(dataURI) {
 angular.module('vida.services', ['ngCordova', 'ngResource'])
 
 
-.factory('httpRequestInterceptor', function(configService) {
-  console.log('- - -[ setting access_tocken on request: ', config.access_token);
-   return {
-      request: function (config) {
-        console.log('---> request intercepted: ', config);
-        // set max timeout since if creds are not valid for endpoint with basic auth, it will go for 90 secs or whatever
-        // the large default is.
-        if (typeof config.access_token === 'undefined') {
-          config.access_token = configService.getConfig().access_token;
-          console.log('- - -[ setting access_tocken on request: ', config.access_token);
-        }
-/*
-        // if request doesn't have authorization header already, add basic auth
-        if (typeof config.headers.Authorization === 'undefined') {
-          config.headers.Authorization = configService.getAuthorizationApiKey();
-        }
+.factory('httpRequestInterceptor', function(configService, $q, $cordovaToast, $injector) {
+  var interceptor_ = {
+    request: function (config) {
+      console.log('----[ intercepted: ', config);
+      var deferred = $q.defer();
 
+      var addAuthHeader = function() {
+        if (!config.headers) {
+          //TODO: ever hit?
+          config.headers = {}
+        }
+        config.headers.Authorization = auth;
+        deferred.resolve(config);
+      };
+
+      if (config.url.indexOf('http') === 0 && configService.isReady() && configService.getConfig()
+      ) {
         // set max timeout since if creds are not valid for endpoint with basic auth, it will go for 90 secs or whatever
         // the large default is.
         if (typeof config.timeout === 'undefined') {
           config.timeout = 10000;
         }
-*/
-        return config;
+
+        var auth = configService.getAuthorizationApiKey();
+        if (auth) {
+          addAuthHeader();
+        } else {
+          $cordovaToast.showShortTop('Please authorize on settings tab!');
+          deferred.resolve(config);
+          /*
+          var loginService = $injector.get('loginService');
+          loginService.loginDjangoGoogleOauth().then(function () {
+            $cordovaToast.showShortBottom('Authorization suceeded');
+            addAuthHeader();
+          }, function () {
+            console.log('==== authorization failed! ====');
+            deferred.reject(config);
+          });
+          */
+        }
+      } else {
+        deferred.resolve(config);
       }
-    };
+
+      return deferred.promise;
+    },
+
+    responseError: function(rejection) {
+      if (rejection.status == 401) {
+        $cordovaToast.showShortTop('Unauthorized request,responseError');
+      } else {
+        $cordovaToast.showShortTop('Error in response');
+      }
+      return $q.reject(rejection);
+    },
+
+    response: function (response) {
+      if (response.status == 401) {
+        $cordovaToast.showShortTop('Unauthorized request, response ');
+      }
+      return response || $q.when(response);
+    }
+  };
+
+  return interceptor_;
 })
 
 .config(function($interpolateProvider, $httpProvider, $resourceProvider) {
+  $httpProvider.interceptors.push('httpRequestInterceptor');
   //$interpolateProvider.startSymbol('{[');
   //$interpolateProvider.endSymbol(']}');
   //$httpProvider.defaults.xsrfCookieName = 'csrftoken';
   //$httpProvider.defaults.xsrfHeaderName = 'X-CSRFToken';
-  //$httpProvider.interceptors.push('httpRequestInterceptor');
   //$httpProvider.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
   //$httpProvider.defaults.headers.common['X-Auth-Token'] = undefined;
 
@@ -65,11 +104,53 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
   };
 }])
 
-.service('uploadService', function($http, configService, $q, geolocationService, $cordovaFileTransfer) {
+
+//TODO: report service should have load [db], save [db], pull [server], push [server]. it should use a new fileService
+//      for media etc. fileService should have save, load, pull, push as well.
+.service('reportService', function($http, configService, $q, geolocationService, $cordovaFileTransfer, localDBService,
+                                   utilService) {
   var service_ = this;
+
+  this.pushMedia = function() {
+    var deferred = $q.defer();
+    localDBService.getAllRows('media').then(function (result) {
+      var filePaths = localDBService.getAllRowsValues(result);
+      var filePathsKeys = localDBService.getAllRowsKeys(result);
+      // upload pics one at a time ("Sync") to be bandwidth conscious
+      utilService.foreachWaitForCompletionSync(filePaths, service_.uploadMedia).then(function(itemsFailed,
+                                                                                              itemsSucceededResponse) {
+        if (itemsFailed.length === 0) {
+          //-- removed pushed media from local db
+          var promises = [];
+          for (var index in filePathsKeys) {
+            promises.push(localDBService.removeKey('media', filePathsKeys[index]));
+          }
+          $q.all(promises).then(function () {
+            deferred.resolve();
+          }, function () {
+            utilService.notify('failed to remove pushed media');
+            deferred.reject();
+          });
+        } else {
+          //utilService.notify('failed to to push ' + itemsFailed.length + ' but succeeded on ' + itemsSucceededResponse.length + ' media');
+          console.log('failed media: ', itemsFailed);
+          console.log('success media: ', itemsSucceededResponse);
+          deferred.reject();
+        }
+      }, function (eFileTransfer) {
+        deferred.reject();
+      });
+    }, function () {
+      utilService.notify('failed to get media from local db');
+      deferred.reject();
+    });
+
+    return deferred.promise;
+  };
 
   // upload media in the provided array
   this.uploadMedia = function(filePath) {
+    var deferred = $q.defer();
     var options = new FileUploadOptions();
     options.fileKey = 'file';
     options.fileName = 'filenameWithExtension.jpg';
@@ -77,61 +158,30 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
       'Content-Type': undefined,
       'Authorization': configService.getAuthorizationApiKey()
     };
-    return $cordovaFileTransfer.upload(configService.getFileServiceURL(), filePath, options);
-  };
+    $cordovaFileTransfer.upload(configService.getFileServiceURL(), filePath, options).then(function() {
+      deferred.resolve();
+    }, function(e) {
+      console.log('----[ uploadMedia.$cordovaFileTransfer error. http_status: ', e.http_status, e);
+      utilService.notify('failed to push any media');
+      deferred.reject(e);
+    });
 
-  //TODO: when an iten in the array failes, still need to return filehashes so that feature can be uploadeded with missing files.
-  this.uploadMediaArray = function(filePaths) {
-    if (!filePaths) {
-      filePaths = [];
-    }
-
-    var deferred = $q.defer();
-    var filePathsFailed = [];
-    var filePathsSucceededFileNames = [];
-
-    var onCompleted = function(succeeded, newFilename) {
-      var completedFilePath = filePaths.pop();
-      if (succeeded) {
-        filePathsSucceededFileNames.push(newFilename);
-      } else {
-        filePathsFailed.push(completedFilePath);
-      }
-      if (filePaths.length === 0) {
-        deferred.resolve(filePathsFailed, filePathsSucceededFileNames);
-      } else {
-        uploadAnother();
-      }
-    };
-
-    var uploadAnother = function() {
-      if (filePaths.length > 0) {
-        service_.uploadMedia(filePaths.slice(-1).pop()).then(function (data) {
-          onCompleted(true, data.name);
-        }, function (e) {
-          onCompleted(false);
-        });
-      } else {
-        // assume success, no failed files and no new filenames
-        deferred.resolve([], []);
-      }
-    };
-
-    uploadAnother();
     return deferred.promise;
   };
 
   this.uploadReport = function(report) {
     var deferred = $q.defer();
     delete report.timestamp_local; // is was a temp key not meant for server
-    $http.post(configService.getReportURL(), JSON.stringify(report), {
+    report = JSON.stringify(report);
+    console.log('----[ posintg report: ', report );
+    $http.post(configService.getReportURL(), report, {
       transformRequest: angular.identity,
       headers: {
         'Authorization': configService.getAuthorizationApiKey()
       }
-    }).success(function() {
+    }).then(function() {
       deferred.resolve();
-    }).error(function(e) {
+    }, function(e) {
       deferred.reject(e);
     });
     return deferred.promise;
@@ -203,9 +253,10 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
       if (array.length > 0) {
         operation(array.slice(-1).pop()).then(function (data) {
           onCompleted(true, data);
-        }, function () {
+        }, function (resp) {
+          console.log('----[ foreachWaitForCompletionSync.operation resp: ', resp);
           service_.notify("a media failed to upload, in uploadAnother");
-          onCompleted(false);
+          onCompleted(false, resp);
         });
       } else {
         // assume success, no failed files and no new filenames
@@ -252,25 +303,28 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
 })
 
 
-.service('trackerService', function($http, $q, configService, geolocationService) {
-  this.post = function (position, mayday) {
+.service('trackerService', function($http, $q, configService, geolocationService, utilService) {
+  this.push = function (position, mayday) {
     var deferred = $q.defer();
 
     var payload = {
       'mayday': mayday,
-      'geom': geolocationService.positionToWKT(position),
+      'geom': {
+        'coordinates': [
+          position.coords.longitude,
+          position.coords.latitude
+        ],
+        'type': 'Point'
+      },
       'user': configService.getConfig().username
     };
 
-    $http.post(configService.getTrackURL(), payload, {
-      'headers': {
-        'Authorization': configService.getAuthorizationApiKey()
-      }
-    }).success(function(data) {
+    $http.post(configService.getTrackURL(), payload).then(function(data) {
       // console.log('----[ trackerService.success: ', data);
       deferred.resolve();
-    }).error(function(error) {
+    }, function(error) {
       console.log('----[ trackerService.error: ', error);
+      utilService.notify('error posting track: ', error);
       deferred.reject(error);
     });
 
@@ -284,8 +338,7 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
     $http.get(configService.getAuthenticationURL(),
       {
         "headers": {
-          "Content-Type": '',
-          "Authorization": configService.getAuthorizationApiKey()
+          "Content-Type": ''
         },
         "timeout": 3000
       }).then(
@@ -336,8 +389,7 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
       timeout: 3000,
 
       "headers": {
-        "Content-Type": '',
-        "Authorization": configService.getAuthorizationApiKey()
+        "Content-Type": ''
       }
     }).done(function(data, textStatus, xhr) {
       console.log('----[ ajax.done: ', xhr);
@@ -402,9 +454,6 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
     var formResource = $resource(configService.getFormURL() + ':id', {}, {
       query: {
         method: 'GET',
-        headers: {
-          "Authorization": configService.getAuthorizationApiKey()
-        },
         timeout: 10000,
         isArray: true,
         transformResponse: $http.defaults.transformResponse.concat([
@@ -537,11 +586,13 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
 
 .service('configService', function(localDBService, $q) {
   var service_ = this;
+  var isReady_ = false;
 
   // when the application is first installed & launched, these settings will be used.
   var initialConfig_ = {
     //serverURL: '192.168.33.15',
-    serverURL: 'flintlock-load-balancer-521350804.eu-central-1.elb.amazonaws.com',
+    //serverURL: 'flintlock-load-balancer-521350804.eu-central-1.elb.amazonaws.com',
+    serverURL: 'cop.imagerytool.net',
     username: null,
     password: null,
     protocol: {
@@ -557,6 +608,7 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
     google: {
       access_token: null,
       client_id: '904279578897-fct0kbo7e8gaa2me2o39655ceoh71v8d.apps.googleusercontent.com',
+      //client_id: '870172265350-qpj5qtn1vddqqkqpbsjhseifehb4j9g3.apps.googleusercontent.com',
       scopes: ['openid', 'email', 'profile']
     },
     django: {
@@ -573,6 +625,7 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
       config_ = $.extend({}, initialConfig_);
       config_ = $.extend( config_, configFromDB );
       console.log('loaded config: ', config_);
+      isReady_ = true;
       deferred.resolve();
     }, function() {
       deferred.reject();
@@ -584,6 +637,10 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
     localDBService.setKey('properties', 'config', config_).then(function(){
       console.log('saved config: ', config_);
     });
+  };
+
+  this.isReady = function() {
+    return isReady_;
   };
 
   // watch and auto-save?
@@ -603,7 +660,10 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
   };
 
   this.getAuthorizationApiKey = function() {
-    return 'ApiKey ' + config_.username + ':' + config_.apikey;
+    if (config_ && config_.username && config_.django.apikey) {
+      return 'ApiKey ' + config_.username + ':' + config_.django.apikey;
+    }
+    return null;
   };
 
   this.getTrackURL = function() {
