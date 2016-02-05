@@ -424,24 +424,46 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
 
   formService.setCurrentForm($stateParams.reportId);
 
-  $scope.addMedia = function(filePath) {
-    console.log('----[ addMedia: ', filePath);
+  $scope.addMedia = function(tempFilePath) {
+    var deferred = $q.defer();
+    console.log('----[ addMedia, tempfile: ', tempFilePath);
 
-    //cordova.file.dataDirectory
+    var processAddMedia = function(filePath) {
+      console.log('----[ processAddMedia, filePath: ', filePath);
+      if (($scope.report[$scope.getMediaPropName()] instanceof Array) === false) {
+        $scope.report[$scope.getMediaPropName()] = [];
+      }
+      utilService.getFileAsBinaryString(filePath, false).then( function(result) {
+        var filenameSha1 = utilService.getSHA1(result) + '.jpg';
+        $scope.mediaPendingUploadMap[filenameSha1] = filePath;
+        $scope.report[$scope.getMediaPropName()].push(filenameSha1);
+        deferred.resolve();
+        console.log('----[ filenameSha1: ', filenameSha1);
+      }, function(err) {
+        deferred.reject(err);
+        console.log('---[ error. failed to get media file binary data: ', err);
+      });
+    };
 
+    var fileInfo = utilService.getFilePathComponents(tempFilePath);
 
-    if (($scope.report[$scope.getMediaPropName()] instanceof Array) === false) {
-      $scope.report[$scope.getMediaPropName()] = [];
-    }
-
-    utilService.getFileAsBinaryString(filePath, false).then( function(result) {
-      var filenameSha1 = utilService.getSHA1(result) + '.jpg';
-      $scope.mediaPendingUploadMap[filenameSha1] = filePath;
-      $scope.report[$scope.getMediaPropName()].push(filenameSha1);
-      console.log('----[ filenameSha1: ', filenameSha1);
-    }, function(err) {
-      console.log('---[ error. failed to get media file binary data: ', err);
+    $cordovaFile.checkFile(fileInfo.dir, fileInfo.filename).then(function(fileSystem){
+      console.log('fileSystem: ', fileSystem);
+      //Move the temp file to permanent storage
+      var localFileInfo = utilService.getFilePathComponents(fileSystem);
+      var newFilename = (new Date()).getTime() + ".jpg";
+      $cordovaFile.copyFile(localFileInfo.dir, localFileInfo.filename, cordova.file.dataDirectory, newFilename)
+        .then(function(success){
+          processAddMedia(success.nativeURL);
+        }, function(error){
+          deferred.reject(error);
+          utilService.notify('Failed to move media to permanent storage: ' + error);
+        });
+    }, function(e) {
+      deferred.reject(e);
     });
+
+    return deferred.promise;
   };
 
   $scope.save = function() {

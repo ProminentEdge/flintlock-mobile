@@ -10,7 +10,8 @@ var db = null;
 angular.module('vida', ['ionic', 'ngCordova', 'vida.directives', 'vida.controllers', 'vida.services', 'leaflet-directive',
     'pascalprecht.translate', 'vida-translations-en', 'vida-translations-es', 'ngResource', 'angularMoment', 'ngCordovaOauth'])
 
-.run(function($q, $ionicPlatform, $window, $cordovaSQLite, configService, localDBService, $cordovaToast, formService) {
+.run(function($q, $ionicPlatform, $window, $cordovaSQLite, configService, localDBService, $cordovaToast, formService,
+              $rootScope) {
   $ionicPlatform.ready(function() {
     // Hide the accessory bar by default (remove this to show the accessory bar above the keyboard
     // for form inputs).
@@ -56,6 +57,7 @@ angular.module('vida', ['ionic', 'ngCordova', 'vida.directives', 'vida.controlle
           $q.all(promises).then(function(){
             console.log('Forms: ', formService.getForms());
             $cordovaToast.showLongTop('config & forms loaded');
+            $rootScope.$broadcast('appReady');
           });
         });
       }
