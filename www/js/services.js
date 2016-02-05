@@ -64,9 +64,19 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
       } else if (rejection.status === 404) {
         $cordovaToast.showShortTop('Server Not Found, check server & protocal');
       } else if (!utilService.isConnected()) {
-        $cordovaToast.showShortTop('No Connectivity, responseError');
+        $cordovaToast.showShortTop('No Connectivity');
       } else {
-        $cordovaToast.showShortTop('Error in response');
+        var msg = 'Error Performing Request.';
+        if (typeof rejection !== 'undefined' && rejection &&
+          typeof rejection.statusText !== 'undefined' && rejection.statusText) {
+          msg += ' Status: ' + rejection.statusText + '.';
+        }
+        if (typeof rejection !== 'undefined' && rejection &&
+          typeof rejection.config !== 'undefined' && rejection.config &&
+          typeof rejection.config.url !== 'undefined' && rejection.config.url) {
+          msg += ' Url: ' + rejection.config.url;
+        }
+        $cordovaToast.showShortTop(msg);
       }
       return $q.reject(rejection);
     },

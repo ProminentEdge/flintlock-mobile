@@ -5,7 +5,7 @@
 
         <label class="item item-input item-select">
           <span class="input-label">{{'settings_language' | translate}}</span>
-          <select ng-change="switchProtocol()"
+          <select ng-change="switchLanguage()"
                   ng-init="configService.getConfig().language=languageOptions[0]"
                   ng-model="configService.getConfig().language"
                   ng-options="option.name | translate for option in languageOptions">

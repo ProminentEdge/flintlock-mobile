@@ -115,7 +115,7 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
 
 .controller('SettingsCtrl', function($scope, $location, configService, $translate, $cordovaOauth, $ionicPopup,
                                      localDBService, $rootScope, $cordovaToast, $cordovaInAppBrowser, loginService,
-                                     $http, $state, reportService){
+                                     $http, $state, reportService, utilService){
   console.log('---------------------------------- SettingsCtrl');
 
   $scope.configService = configService;
@@ -156,12 +156,16 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
   };
 
   $scope.authorize = function() {
-    loginService.loginDjangoGoogleOauth().then(function(){
-      $cordovaToast.showShortBottom('Authorization suceeded');
-      $state.go('vida.report-create');
-    }, function(){
-      console.log('==== authorization failed! ====');
-    });
+    if (utilService.isConnected()) {
+      loginService.loginDjangoGoogleOauth().then(function () {
+        $cordovaToast.showShortBottom('Authorization suceeded');
+        $state.go('vida.report-create');
+      }, function () {
+        console.log('==== authorization failed! ====');
+      });
+    } else {
+      $cordovaToast.showShortBottom('Cannot authorize without network connectivity');
+    }
   };
 
   $scope.switchLanguage = function() {
