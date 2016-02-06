@@ -14,20 +14,20 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
 .factory('httpRequestInterceptor', function(configService, $q, $cordovaToast, utilService, $injector) {
   var interceptor_ = {
     request: function (config) {
-      console.log('----[ intercepted: ', config);
       var deferred = $q.defer();
 
-      var addAuthHeader = function() {
-        if (!config.headers) {
-          //TODO: ever hit?
-          config.headers = {}
-        }
-        config.headers.Authorization = auth;
-        deferred.resolve(config);
-      };
+      if (config.url.indexOf('http') === 0 && configService.isReady() && configService.getConfig()) {
+        console.log('----[ intercepted external: ', config);
 
-      if (config.url.indexOf('http') === 0 && configService.isReady() && configService.getConfig()
-      ) {
+        var addAuthHeader = function() {
+          if (!config.headers) {
+            //TODO: ever hit?
+            config.headers = {}
+          }
+          config.headers.Authorization = auth;
+          deferred.resolve(config);
+        };
+
         // set max timeout since if creds are not valid for endpoint with basic auth, it will go for 90 secs or whatever
         // the large default is.
         if (typeof config.timeout === 'undefined') {
@@ -204,32 +204,33 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
 
 .service('utilService', function($cordovaFile, $q, $cordovaToast) {
   var service_ = this;
-/*
-  var connectionTypeToString_ = {};
-  connectionTypeToString_[Connection.UNKNOWN]  = 'Unknown connection';
-  connectionTypeToString_[Connection.ETHERNET] = 'Ethernet connection';
-  connectionTypeToString_[Connection.WIFI]     = 'WiFi connection';
-  connectionTypeToString_[Connection.CELL_2G]  = 'Cell 2G connection';
-  connectionTypeToString_[Connection.CELL_3G]  = 'Cell 3G connection';
-  connectionTypeToString_[Connection.CELL_4G]  = 'Cell 4G connection';
-  connectionTypeToString_[Connection.CELL]     = 'Cell generic connection';
-  connectionTypeToString_[Connection.NONE]     = 'No network connection';
 
-  this.getConnectionTypeString = function() {
-    return connectionTypeToString_[navigator.connection.type];
-  };
-*/
   this.isConnected = function() {
     return navigator.connection.type !== Connection.NONE;
+  };
+
+  this.getFilePathComponents = function(filePath) {
+    var info = {
+      filename: null,
+      ext: null,
+      dir: null
+    };
+
+    if (filePath) {
+      var lastSlashIndex = filePath.lastIndexOf("/");
+      info.dir = filePath.substring(0, lastSlashIndex);
+      info.filename = filePath.substring(lastSlashIndex + 1);
+      var lastDotIndex = info.filename.lastIndexOf(".");
+      info.ext = info.filename.substring(lastDotIndex + 1);
+    }
+    return info;
   };
 
   // given a full file path, get the binary data in the file
   this.getFileAsBinaryString = function(filePath, encodeAsBase64) {
     var deferred = $q.defer();
-    var lastSlashIndex = filePath.lastIndexOf("/");
-    var fileDir = filePath.substring(0, lastSlashIndex);
-    var filename = filePath.substring(lastSlashIndex + 1);
-    $cordovaFile.readAsBinaryString(fileDir, filename).then(function(data) {
+    var fileInfo = service_.getFilePathComponents(filePath);
+    $cordovaFile.readAsBinaryString(fileInfo.dir, fileInfo.filename).then(function(data) {
       if (encodeAsBase64) {
         deferred.resolve(btoa(data));
       } else {

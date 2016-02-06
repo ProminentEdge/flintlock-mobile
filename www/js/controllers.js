@@ -341,6 +341,23 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
   $scope.isLoading = false;
   $scope.formService = formService;
 
+  $scope.$on('appReady', function(){
+    $scope.updateBadge(); // move after defining method and remove anon func
+  });
+
+  $scope.updateBadge = function() {
+    var deferred = $q.defer();
+    //-- update badge for pending reports
+    localDBService.getRowsCount('reports').then(function (count) {
+      $rootScope.pendingReportsCount = count;
+      deferred.resolve();
+    }, function() {
+      console.log('Badge update failed.');
+      deferred.reject();
+    });
+    return deferred.promise;
+  };
+
   $scope.sync = function() {
     if (!$scope.isLoading) {
       $scope.isLoading = true;
@@ -371,10 +388,12 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
                 //-- push media
                 var mediaCompleted = function(){
                   //-- update badge for pending reports
-                  localDBService.getRowsCount('reports').then(function (count) {
-                    $rootScope.pendingReportsCount = count;
+                  $scope.updateBadge().then(function () {
                     configService.getConfig().syncLastSuccess = new Date();
                     configService.saveConfig();
+                    $scope.isLoading = false;
+                    utilService.notify('Sync Completed.');
+                  }, function() {
                     $scope.isLoading = false;
                     utilService.notify('Sync Completed.');
                   });
@@ -416,7 +435,8 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
 
 .controller('ReportDetailCtrl', function($scope, $rootScope, $stateParams, $cordovaActionSheet, $cordovaCamera, $filter,
                                          $ionicLoading, reportService, utilService, localDBService, geolocationService,
-                                         $cordovaToast, $cordovaProgress, $q, $state, formService){
+                                         $cordovaToast, $cordovaProgress, $q, $state, formService, $window, $cordovaFile,
+                                         $cordovaFileTransfer){
   console.log("---- ReportDetailCtrl");
   $scope.formService = formService;
   $scope.report = {};
@@ -424,6 +444,8 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
 
   formService.setCurrentForm($stateParams.reportId);
 
+  // iOS:  store pics in temp folder needs to be moved to application folder
+  // Android: pics from library have uri 'content://....' format
   $scope.addMedia = function(tempFilePath) {
     var deferred = $q.defer();
     console.log('----[ addMedia, tempfile: ', tempFilePath);
@@ -445,21 +467,111 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
       });
     };
 
-    var fileInfo = utilService.getFilePathComponents(tempFilePath);
-
-    $cordovaFile.checkFile(fileInfo.dir, fileInfo.filename).then(function(fileSystem){
-      console.log('fileSystem: ', fileSystem);
-      //Move the temp file to permanent storage
-      var localFileInfo = utilService.getFilePathComponents(fileSystem);
-      var newFilename = (new Date()).getTime() + ".jpg";
-      $cordovaFile.copyFile(localFileInfo.dir, localFileInfo.filename, cordova.file.dataDirectory, newFilename)
-        .then(function(success){
-          processAddMedia(success.nativeURL);
-        }, function(error){
-          deferred.reject(error);
-          utilService.notify('Failed to move media to permanent storage: ' + error);
-        });
+    console.log('----[ platform.ionic: ', ionic.Platform.isIOS());
+    $window.resolveLocalFileSystemURL(tempFilePath, function(fileSystem) {
+      console.log('tempFilePath fileSystem: ', fileSystem);
+      // iOS: uri returned from camera / library points to a file in tmp folder which will be removed when
+      //      application is resatrted. Need to move file to application folder first.
+      //
+      // Android: when choosing from library/gallery on NEWER androids, it is not a file path. instead something like:
+      //          content://com.google.android.apps.photos.contentprovider/-1/1/content%3A%2F%2Fmedia%2Fexternal%2Fimages%2Fmedia%2F85271/ACTUAL/2115746354
+      //          can download it using file transfer but got permission error.
+      //
+      // Other option is to just get teh image as base64 encoded string from 'camera' (DATA_URL) and write a file.
+      if (tempFilePath.indexOf('content://') !== 0) {
+          //Move the temp file to permanent storage
+        var localFileInfo = utilService.getFilePathComponents(tempFilePath);
+        var newFilename = (new Date()).getTime() + ".jpg";
+        $cordovaFile.copyFile(localFileInfo.dir, localFileInfo.filename, cordova.file.dataDirectory, newFilename)
+          .then(function(success){
+            processAddMedia(success.nativeURL);
+          }, function(error){
+            deferred.reject(error);
+            utilService.notify('Failed to move media to permanent storage: ' + error);
+          });
+      } else {
+        deferred.reject('not supported');
+        utilService.notify('Cannot use file from library on this version of the OS');
+      }
     }, function(e) {
+      console.log('fileSystem failed. e ', e);
+      deferred.reject(e);
+    });
+
+    return deferred.promise;
+  };
+
+  $scope.addMediaFix = function(tempFilePath) {
+    var deferred = $q.defer();
+    console.log('----[ addMedia, tempfile: ', tempFilePath);
+    //tempFilePath = tempFilePath.replace("%", "%25");
+    //console.log('----[ addMedia, r##$#$#$#$#$#$#$##$ replacing% with %25: ', tempFilePath);
+
+    var processAddMedia = function(filePath) {
+      console.log('----[ processAddMedia, filePath: ', filePath);
+      if (($scope.report[$scope.getMediaPropName()] instanceof Array) === false) {
+        $scope.report[$scope.getMediaPropName()] = [];
+      }
+      utilService.getFileAsBinaryString(filePath, false).then( function(result) {
+        var filenameSha1 = utilService.getSHA1(result) + '.jpg';
+        $scope.mediaPendingUploadMap[filenameSha1] = filePath;
+        $scope.report[$scope.getMediaPropName()].push(filenameSha1);
+        deferred.resolve();
+        console.log('----[ filenameSha1: ', filenameSha1);
+      }, function(err) {
+        deferred.reject(err);
+        console.log('---[ error. failed to get media file binary data: ', err);
+      });
+    };
+
+    console.log('----[ platform.ionic: ', ionic.Platform.isIOS());
+    $window.resolveLocalFileSystemURL(tempFilePath, function(theFile) {
+      console.log('tempFilePath fileSystem: ', theFile);
+      console.log('tempFilePath fileSystem toURL: ', theFile.toURL());
+      console.log('tempFilePath fileSystem toInternalURL: ', theFile.toInternalURL());
+      console.log('tempFilePath fileSystem nativeURL: ', theFile.nativeURL);
+
+      // they say this works:
+      // http://stackoverflow.com/questions/10335563/capturing-and-storing-a-picture-taken-with-the-camera-into-a-local-database-ph
+
+      var newFilename = (new Date()).getTime() + ".jpg";
+      var destDirname = "media_fl";
+
+      $window.requestFileSystem(LocalFileSystem.PERSISTENT, 0, function(fileSys) {
+        fileSys.root.getDirectory( destDirname, {
+          create:true,
+          exclusive: false
+        },
+        function(directory) {
+          if (theFile.nativeURL.indexOf('content://') === 0) {
+            var downloadedFilename = directory.nativeURL + newFilename;
+            $cordovaFileTransfer.download(theFile.nativeURL, downloadedFilename, {}, true).then(function(){
+              processAddMedia(downloadedFilename);
+            }, function(e){
+              deferred.reject(e);
+              utilService.notify('Failed to _download_ file to permanent storage: ' + e);
+            });
+          } else {
+            theFile.moveTo(directory, newFilename, function(file) {
+              processAddMedia(file.nativeURL);
+            },
+            function(e){
+              deferred.reject(e);
+              utilService.notify('Failed to move media to permanent storage: ' + e);
+            });
+          }
+        },
+        function(e){
+          deferred.reject(e);
+          utilService.notify('Failed to getDirectory: ' + e);
+        });
+      },
+      function(e){
+        deferred.reject(e);
+        utilService.notify('Failed to resolve fileSystem: ' + e);
+      });
+    }, function(e) {
+      console.log('fileSystem failed. e ', e);
       deferred.reject(e);
     });
 
@@ -568,7 +680,8 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
 
   $scope.takeCameraPhoto_Personal = function(source) {
     var options = {
-      quality: 90,
+      quality: 30,  // 1 is terrible with missing colors.
+                    // for low bandwidth environments, 30 seems to be decent. 400kb vs 2.1 MB
       destinationType: Camera.DestinationType.FILE_URI,  // write to file
       sourceType: source,
       allowEdit: true,
