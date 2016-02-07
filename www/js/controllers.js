@@ -120,6 +120,7 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
 
   $scope.configService = configService;
   $scope.reportService = reportService;
+  $scope.isPushingMedia = false;
 
   $scope.languageOptions = [
     {
@@ -220,7 +221,36 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
 
   $scope.pushMedia = function() {
     console.log('---------- pushMedia');
-    reportService.pushMedia();
+    if ($scope.isPushingMedia === false) {
+      $scope.isPushingMedia = true;
+
+      var onSuccess = function(){
+        $scope.isPushingMedia = false;
+        $cordovaToast.showShortBottom('Completed pushing media');
+      };
+
+      var onError = function(){
+        $scope.isPushingMedia = false;
+      };
+
+      localDBService.getRowsCount('media').then(function (count) {
+        if (count > 0) {
+          $ionicPopup.confirm({
+            title: 'Push Media',
+            template: 'Push the ' + count + ' media as opposed to a full sync?'
+          }).then(function (res) {
+            if (res) {
+              reportService.pushMedia().then(onSuccess, onError);
+            } else {
+              onError();
+            }
+          });
+        } else {
+          $scope.isPushingMedia = false;
+          $cordovaToast.showShortBottom('No media to push');
+        }
+      }, onError);
+    }
   }
 
 })

@@ -39,7 +39,7 @@
         <div class="spacer" style="width: 300px; height: 20px;"></div>
         <button class="button button-assertive button-block" ng-click="resetDB()">Reset Database</button>
         <button class="button button-positive button-block" ng-click="dumpDB()">Log Database</button>
-        <button class="button button-positive button-block" ng-click="pushMedia()">Push Media</button>
+        <button class="button button-positive button-block" ng-disabled="isPushingMedia" ng-click="pushMedia()">Push Media</button>
       </form>
     </ion-content>
   </ion-pane>
