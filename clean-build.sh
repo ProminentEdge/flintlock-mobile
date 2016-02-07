@@ -49,6 +49,7 @@ ionic plugin add https://github.com/brodysoft/Cordova-SQLitePlugin.git
 ionic plugin add https://github.com/an-rahulpandey/cordova-plugin-dbcopy.git
 ionic plugin add https://github.com/pbernasconi/cordova-progressIndicator.git
 ionic plugin add cordova-plugin-geolocation
+ionic plugin add cordova-plugin-splashscreen
 
 # pegged at 1.1.1 to fix google oauth error on android only where login would complete but browser would give
 # connection refused for http://localhost/callback even though it was correct with the token on it
