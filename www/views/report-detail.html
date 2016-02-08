@@ -20,13 +20,10 @@
         <input ng-if="prop.type === 'datetime'" type="datetime-local" ng-model="report[propName]"/>
       </div>
 
-      <label class="item item-input" ng-if="hasMedia()">
-        <span class="input-label">{{getMediaPropName()}}:</span>
-        <button ng-click="showCameraModal()" style="" class="button icon ion-camera"></button>
-      </label>
+      <button ng-if="hasMedia()" ng-click="showCameraModal()" style="" class="button icon ion-camera button-block">&nbsp;Add Photo</button>
       <ion-list>
         <ion-item ng-repeat="mediaHash in report[getMediaPropName()]">
-          <img style="max-width: 250px"
+          <img style="display: block; max-width: 250px; margin: auto;"
                ng-src="{{mediaPendingUploadMap[mediaHash]}}"
                err-src="{{peopleService.getPlaceholderImage()}}"/>
         </ion-item>
