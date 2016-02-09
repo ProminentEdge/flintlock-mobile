@@ -295,7 +295,7 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
   $scope.trackingScheduleNext = function() {
     if ($scope.tracking.state) {
       if ($scope.trackingInterval !== null) return;
-      $scope.trackingInterval = $timeout($scope.trackingProcess, 10000);
+      $scope.trackingInterval = $timeout($scope.trackingProcess, 60000 * 5);
     }
   };
 
