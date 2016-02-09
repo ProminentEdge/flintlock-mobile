@@ -22,7 +22,7 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
         var addAuthHeader = function() {
           if (!config.headers) {
             //TODO: ever hit?
-            config.headers = {}
+            config.headers = {};
           }
           config.headers.Authorization = auth;
           deferred.resolve(config);
@@ -122,34 +122,21 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
 //TODO: report service should have load [db], save [db], pull [server], push [server]. it should use a new fileService
 //      for media etc. fileService should have save, load, pull, push as well.
 .service('reportService', function($http, configService, $q, geolocationService, $cordovaFileTransfer, localDBService,
-                                   utilService) {
+                                   utilService, $cordovaFile) {
   var service_ = this;
 
   this.pushMedia = function() {
     var deferred = $q.defer();
     localDBService.getAllRows('media').then(function (result) {
-      var filePaths = localDBService.getAllRowsValues(result);
-      var filePathsKeys = localDBService.getAllRowsKeys(result);
+      var fileHashAndPaths = localDBService.getAllRowsKVArrays(result);
       // upload pics one at a time ("Sync") to be bandwidth conscious
-      utilService.foreachWaitForCompletionSync(filePaths, service_.uploadMedia).then(function(itemsFailed,
-                                                                                              itemsSucceededResponse) {
-        if (itemsFailed.length === 0) {
-          //-- removed pushed media from local db
-          var promises = [];
-          for (var index in filePathsKeys) {
-            promises.push(localDBService.removeKey('media', filePathsKeys[index]));
-          }
-          $q.all(promises).then(function () {
-            deferred.resolve();
-          }, function () {
-            utilService.notify('failed to remove pushed media');
-            deferred.reject();
-          });
+      utilService.foreachWaitForCompletionSync(fileHashAndPaths, service_.uploadAndRemoveMedia).then(function(resp) {
+        if (resp.failed.length === 0) {
+          deferred.resolve();
         } else {
-          //utilService.notify('failed to to push ' + itemsFailed.length + ' but succeeded on ' + itemsSucceededResponse.length + ' media');
-          console.log('failed media: ', itemsFailed);
-          console.log('success media: ', itemsSucceededResponse);
-          deferred.reject();
+          console.log('failed media: ', resp.failed);
+          console.log('succeeded media: ', resp.succeeded);
+          deferred.reject(resp);
         }
       }, function (eFileTransfer) {
         deferred.reject();
@@ -163,20 +150,41 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
   };
 
   // upload media in the provided array
-  this.uploadMedia = function(filePath) {
+  this.uploadAndRemoveMedia = function(fileHash, filePath) {
+    var deferred = $q.defer();
+
+    var onError = function(e){
+      console.log('====[ uploadAndRemoveMedia Failed for: ', fileHash, filePath, 'Error: ', e);
+      deferred.reject(fileHash);
+    };
+
+    service_.uploadFile(configService.getFileServiceURL(), fileHash, filePath).then(function(response) {
+      localDBService.removeKey('media', fileHash).then(function () {
+        var localFileInfo = utilService.getFilePathComponents(filePath);
+        $cordovaFile.removeFile(localFileInfo.dir, localFileInfo.filename).then(function(){
+            console.log('----[ uploadMedia & removing completed for: ', fileHash, filePath);
+          deferred.resolve(response);
+          }, onError);
+      }, onError);
+    }, onError);
+
+    return deferred.promise;
+  };
+
+  this.uploadFile = function(url, filename, filePath) {
     var deferred = $q.defer();
     var options = new FileUploadOptions();
     options.fileKey = 'file';
-    options.fileName = 'filenameWithExtension.jpg';
+    options.fileName = filename;
     options.headers = {
       'Content-Type': undefined,
       'Authorization': configService.getAuthorizationApiKey()
     };
-    $cordovaFileTransfer.upload(configService.getFileServiceURL(), filePath, options).then(function() {
-      deferred.resolve();
+    $cordovaFileTransfer.upload(url, filePath, options).then(function(response) {
+      deferred.resolve(response);
     }, function(e) {
       console.log('----[ uploadMedia.$cordovaFileTransfer error. http_status: ', e.http_status, e);
-      utilService.notify('failed to push any media');
+      utilService.notify('failed to a media: ' + filename);
       deferred.reject(e);
     });
 
@@ -276,7 +284,10 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
         itemsFailed.push(completed);
       }
       if (array.length === 0) {
-        deferred.resolve(itemsFailed, itemsSucceededResponse);
+        deferred.resolve({
+          succeeded: itemsSucceededResponse,
+          failed: itemsFailed
+        });
       } else {
         uploadAnother();
       }
@@ -284,16 +295,18 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
 
     var uploadAnother = function () {
       if (array.length > 0) {
-        operation(array.slice(-1).pop()).then(function (data) {
+        operation.apply(this, array.slice(-1).pop()).then(function (data) {
           onCompleted(true, data);
         }, function (resp) {
-          console.log('----[ foreachWaitForCompletionSync.operation resp: ', resp);
-          service_.notify("a media failed to upload, in uploadAnother");
+          console.log('----[ foreachWaitForCompletionSync.uploadAnother, operation resp: ', resp);
           onCompleted(false, resp);
         });
       } else {
         // assume success, no failed files and no new filenames
-        deferred.resolve([], []);
+        deferred.resolve({
+          succeeded: [],
+          failed: []
+        });
       }
     };
 
@@ -987,6 +1000,15 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
     var arr = [];
     for (var i = 0; i < result.rows.length; i++){
       arr.push(result.rows.item(i).key);
+    }
+    return arr;
+  };
+
+  this.getAllRowsKVArrays = function(result) {
+    var arr = [];
+    for (var i = 0; i < result.rows.length; i++){
+      var item = result.rows.item(i);
+      arr.push([item.key, item.value]);
     }
     return arr;
   };

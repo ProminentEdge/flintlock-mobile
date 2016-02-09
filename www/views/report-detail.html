@@ -23,7 +23,7 @@
       <button ng-if="hasMedia()" ng-click="showCameraModal()" style="" class="button icon ion-camera button-block">&nbsp;Add Photo</button>
       <ion-list>
         <ion-item ng-repeat="mediaHash in report[getMediaPropName()]">
-          <img style="display: block; max-width: 250px; margin: auto;"
+          <img style="display: block; max-height: 300px; margin: auto;"
                ng-src="{{mediaPendingUploadMap[mediaHash]}}"
                err-src="{{peopleService.getPlaceholderImage()}}"/>
         </ion-item>

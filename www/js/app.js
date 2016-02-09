@@ -57,7 +57,8 @@ angular.module('vida', ['ionic', 'ngCordova', 'vida.directives', 'vida.controlle
           $q.all(promises).then(function(){
             console.log('Forms: ', formService.getForms());
             $cordovaToast.showLongTop('config & forms loaded');
-            $rootScope.$broadcast('appReady');
+            $rootScope.$broadcast('appReady');  // configService is ready
+            $rootScope.$broadcast('updateBadge');
           });
         });
       }

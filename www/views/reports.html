@@ -12,10 +12,15 @@
         <span ng-if="configService.getConfig().syncLastSuccess" am-time-ago="configService.getConfig().syncLastSuccess"></span>
         <span ng-if="!configService.getConfig().syncLastSuccess">Click here to sync!</span>
       </div>
-      <div class="item item-icon-left" ng-if="pendingReportsCount>0" ng-click="sync()">
+      <div class="item item-icon-left" ng-if="pendingReportsCount > 0" ng-click="sync()">
         <i class="icon ion-clipboard"></i>
         <span>Reports Are Pending!</span>
         <span class="badge badge-assertive">{{pendingReportsCount}}</span>
+      </div>
+      <div class="item item-icon-left" ng-if="pendingMediaCount > 0" ng-click="sync()">
+        <i class="icon ion-images"></i>
+        <span>Media Are Pending!</span>
+        <span class="badge badge-assertive">{{pendingMediaCount}}</span>
       </div>
 
     </form>

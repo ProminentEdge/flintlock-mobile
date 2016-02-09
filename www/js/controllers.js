@@ -226,6 +226,7 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
 
       var onSuccess = function(){
         $scope.isPushingMedia = false;
+        $rootScope.$broadcast('updateBadge');
         $cordovaToast.showShortBottom('Completed pushing media');
       };
 
@@ -251,7 +252,7 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
         }
       }, onError);
     }
-  }
+  };
 
 })
 
@@ -371,20 +372,25 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
   $scope.isLoading = false;
   $scope.formService = formService;
 
-  $scope.$on('appReady', function(){
-    $scope.updateBadge(); // move after defining method and remove anon func
+  $rootScope.$on('updateBadge', function(){
+    $scope.updateBadge();
   });
 
   $scope.updateBadge = function() {
     var deferred = $q.defer();
-    //-- update badge for pending reports
-    localDBService.getRowsCount('reports').then(function (count) {
-      $rootScope.pendingReportsCount = count;
-      deferred.resolve();
-    }, function() {
+    var onError = function() {
       console.log('Badge update failed.');
       deferred.reject();
-    });
+    };
+
+    //-- update badge for pending reports & media
+    localDBService.getRowsCount('reports').then(function (reports) {
+      $rootScope.pendingReportsCount = reports;
+      localDBService.getRowsCount('media').then(function (media) {
+        $rootScope.pendingMediaCount = media;
+        deferred.resolve();
+      }, onError);
+    }, onError);
     return deferred.promise;
   };
 
@@ -418,24 +424,21 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
                 //-- push media
                 var mediaCompleted = function(){
                   //-- update badge for pending reports
-                  $scope.updateBadge().then(function () {
-                    configService.getConfig().syncLastSuccess = new Date();
-                    configService.saveConfig();
-                    $scope.isLoading = false;
-                    utilService.notify('Sync Completed.');
-                  }, function() {
-                    $scope.isLoading = false;
-                    utilService.notify('Sync Completed.');
-                  });
+                  $rootScope.$broadcast('updateBadge');
+                  configService.getConfig().syncLastSuccess = new Date();
+                  configService.saveConfig();
+                  $scope.isLoading = false;
+                  utilService.notify('Sync Completed.');
                 };
 
                 reportService.pushMedia().then(function(){
                   mediaCompleted();
-                }, function(){
+                }, function(resp){
+                  utilService.notify('Media push failed. ' + resp.succeeded.length + ' of ' + resp.failed.length + ' succeeded.');
                   mediaCompleted();
                 });
               }, function () {
-                utilService.notify("failed to remove pushed reports");
+                utilService.notify('failed to remove pushed reports');
                 $scope.isLoading = false;
               });
             }, function (e) {
@@ -630,25 +633,20 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
       };
 
       localDBService.insertValue('reports', payload).then(function() {
-        localDBService.getRowsCount('reports').then(function(count) {
-          $rootScope.pendingReportsCount = count;
-
-          //TODO: implement foreachWaitForCompletionAsync such that it can call setKey and pass all arguments to it
-          var promises = [];
-          for (var key in $scope.mediaPendingUploadMap) {
-            promises.push(localDBService.setKey('media', key, $scope.mediaPendingUploadMap[key], false));
-          }
-          $q.all(promises).then(function() {
-            $scope.mediaPendingUploadMap = {};
-            $cordovaProgress.hide();
-            utilService.notify("Report saved to local db");
-            $state.go('vida.report-create');
-          },
-          function(){
-            utilService.notify("failed to save media to local db: " + key);
-            $cordovaProgress.hide();
-          });
-        }, function() {
+        //TODO: implement foreachWaitForCompletionAsync such that it can call setKey and pass all arguments to it
+        var promises = [];
+        for (var key in $scope.mediaPendingUploadMap) {
+          promises.push(localDBService.setKey('media', key, $scope.mediaPendingUploadMap[key], false));
+        }
+        $q.all(promises).then(function() {
+          $scope.mediaPendingUploadMap = {};
+          $cordovaProgress.hide();
+          $rootScope.$broadcast('updateBadge');
+          utilService.notify("Report saved to local db");
+          $state.go('vida.report-create');
+        },
+        function(){
+          utilService.notify("failed to save media to local db: " + key);
           $cordovaProgress.hide();
         });
       });
