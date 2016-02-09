@@ -13,4 +13,4 @@ mkdir -p flintlock-bin/android
 mv platforms/android/build/outputs/apk/android-debug.apk flintlock-bin/android/flintlock.apk
 
 echo ========== Done ==========
-echo ***** please upload to https://drive.google.com/open?id=0B6etBAcFVYMNdUF0dHBaMkJwTjA ****8
+echo '***** please upload to https://drive.google.com/open?id=0B6etBAcFVYMNdUF0dHBaMkJwTjA ****'
