@@ -76,6 +76,7 @@
     'button_change_credentials': 'Change Credentials',
     'button_request_account': 'Or request an account',
     'button_shelter_search': 'Back to Shelter Map',
+    'button_login_cancel': 'Cancel Login',
     'search_searchfield': 'Search',
     'search_age': 'Age',
     'settings_cache_photos': 'Cache Photos',

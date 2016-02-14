@@ -16,7 +16,8 @@
 
         <label class="item item-input">
           <span class="input-label">{{'settings_server' | translate}}</span>
-          <input type="text" placeholder="app.flintlock.net" ng-model-options='{debounce: 2000}' ng-change="configService.saveConfig()" ng-model="configService.getConfig().serverURL">
+          <input type="text" placeholder="your-server.com" ng-model-options='{debounce: 2000}' ng-change="configService.saveConfig()" ng-model="configService.getConfig().serverURL"
+                 autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
         </label>
         <label class="item item-input item-select">
           <span class="input-label">{{'settings_server_protocol' | translate}}</span>
@@ -33,13 +34,31 @@
           <span class="input-label">Username </span>
           <input type="text" ng-disabled="true" ng-model="configService.getConfig().username">
         </label>
-        <button class="button button-positive button-block" ng-click="authorize()">{{'Authorize'}}</button>
         <button ng-if="configService.getConfig().username" class="button button-positive button-block" ng-click="deauthorize()">{{'Deauthorize'}}</button>
+        <button class="button button-positive button-block" ng-click="authorizeWithGoogle()">{{'Authorize With Google'}}</button>
 
         <div class="spacer" style="width: 300px; height: 20px;"></div>
-        <button class="button button-assertive button-block" ng-click="resetDB()">Reset Database</button>
-        <button class="button button-positive button-block" ng-click="dumpDB()">Log Database</button>
-        <button class="button button-positive button-block" ng-disabled="isPushingMedia" ng-click="pushMedia()">Push Media</button>
+
+        <ion-toggle ng-model="developer.state" toggle-class="toggle-positive">{{'Developer Mode'}}</ion-toggle>
+        <div class="spacer" style="width: 300px; height: 20px;"></div>
+        <div ng-if="developer.state">
+          <label class="item item-input">
+            <span class="input-label">Username </span>
+            <input type="text" ng-model="configService.getConfig().username"
+                   autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+          </label>
+          <label class="item item-input">
+            <span class="input-label">{{'apikey'}}</span>
+            <input type="text" placeholder="django api key" ng-model-options='{debounce: 2000}' ng-change="configService.saveConfig()" ng-model="configService.getConfig().django.apikey"
+                   autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+          </label>
+          <!-- Basic Auth fails when trying to upload files since we have added ApiKey Auth. See notes in fileservice.
+          <button class="button button-positive button-block" ng-click="authorizeWithDjango()">{{'Authorize With Django'}}</button>
+          -->
+          <button class="button button-assertive button-block" ng-click="resetDB()">Reset Database</button>
+          <button class="button button-positive button-block" ng-click="dumpDB()">Log Database</button>
+          <button class="button button-positive button-block" ng-disabled="isPushingMedia" ng-click="pushMedia()">Push Media</button>
+        </div>
       </form>
     </ion-content>
   </ion-pane>

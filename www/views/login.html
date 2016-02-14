@@ -20,8 +20,11 @@
         </label>
       </ion-list>
 
-      <button class="button button-positive button-block" ng-click="login('/tabs', true)">{{'button_login' | translate}}</button>
-      <a href="" class="button button-positive button-clear button-block" ng-click="login('/tabs', false)">{{'button_save_credentials_without_verification' | translate}}</a>
+      <button class="button button-positive button-block" ng-click="login(true)">{{'button_login' | translate}}</button>
+      <a href="" class="button button-positive button-clear button-block" ng-click="login(false)">{{'button_save_credentials_without_verification' | translate}}</a>
+      <!--
+      <a href="" class="button button-positive button-clear button-block" ng-click="cancel()">{{'button_login_cancel' | translate}}</a>
+      -->
     </form>
   </ion-content>
 </ion-view>

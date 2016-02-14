@@ -121,6 +121,7 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
   $scope.configService = configService;
   $scope.reportService = reportService;
   $scope.isPushingMedia = false;
+  $scope.developer = { state: false };
 
   $scope.languageOptions = [
     {
@@ -156,9 +157,9 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
     });
   };
 
-  $scope.authorize = function() {
+  $scope.authorizeWithGoogle = function() {
     if (utilService.isConnected()) {
-      loginService.loginDjangoGoogleOauth().then(function () {
+      loginService.loginGoogle().then(function () {
         $cordovaToast.showShortBottom('Authorization suceeded');
         $state.go('vida.report-create');
       }, function () {
@@ -167,6 +168,10 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
     } else {
       $cordovaToast.showShortBottom('Cannot authorize without network connectivity');
     }
+  };
+
+  $scope.authorizeWithDjango = function() {
+    $state.go('login');
   };
 
   $scope.switchLanguage = function() {
@@ -331,19 +336,19 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
 })
 
 .controller('loginCtrl', function($scope, $location, $http, configService, $filter, $cordovaToast,
-                                  loginService, $cordovaProgress){
+                                  loginService, $cordovaProgress, $state){
   console.log('---------------------------------- loginCtrl');
   $scope.configService = configService;
 
-  $scope.login = function(gotoUrl, verify) {
+  $scope.login = function(verify) {
     // Request authorization
     if ((configService.getConfig().username) && (configService.getConfig().password)) {
       configService.saveConfig();
       if (verify) {
         $cordovaProgress.showSimpleWithLabelDetail(true, "Logging in", "Verifying Credentials");
 
-        loginService.login(configService.getConfig().username, configService.getConfig().password).then(function () {
-            $location.path(gotoUrl);
+        loginService.loginDjango(configService.getConfig().username, configService.getConfig().password).then(function () {
+            $state.go('vida.report-create');
             $cordovaProgress.hide();
           },
           function () {
@@ -351,7 +356,7 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
           }
         );
       } else {
-        $location.path(gotoUrl);
+        $state.go('vida.report-create');
       }
     } else {
       if (!(configService.getConfig().username) && !(configService.getConfig().password)) {
@@ -397,10 +402,6 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
   $scope.sync = function() {
     if (!$scope.isLoading) {
       $scope.isLoading = true;
-
-      var rejected = function() {
-        utilService.notify('sync failed.');
-      };
 
       //-- pull forms
       formService.pullFroms().then(function(forms) {
@@ -454,12 +455,7 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
           utilService.notify('failed to remove all existing forms from local db');
         });
       }, function (e) {
-        console.log('----------------- error: ', e);
-        if (e && e.status === 401){
-          utilService.notify('Please Authorize the app to connect to the server through the settings tab');
-        } else {
-          utilService.notify('failed to pull forms');
-        }
+        console.log('====[ Error: ', e);
         $scope.isLoading = false;
       });
     }

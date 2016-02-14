@@ -19,37 +19,40 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
       if (config.url.indexOf('http') === 0 && configService.isReady() && configService.getConfig()) {
         console.log('----[ intercepted external: ', config);
 
-        var addAuthHeader = function() {
-          if (!config.headers) {
-            //TODO: ever hit?
-            config.headers = {};
+        if (configService.getServerURL()) {
+          var addAuthHeader = function() {
+            if (!config.headers) {
+              //TODO: ever hit?
+              config.headers = {};
+            }
+            config.headers.Authorization = auth;
+            deferred.resolve(config);
+          };
+
+          // set max timeout since if creds are not valid for endpoint with basic auth, it will go for 90 secs or whatever
+          // the large default is.
+          if (typeof config.timeout === 'undefined') {
+            config.timeout = 10000;
           }
-          config.headers.Authorization = auth;
-          deferred.resolve(config);
-        };
 
-        // set max timeout since if creds are not valid for endpoint with basic auth, it will go for 90 secs or whatever
-        // the large default is.
-        if (typeof config.timeout === 'undefined') {
-          config.timeout = 10000;
-        }
-
-        var auth = configService.getAuthorizationApiKey();
-        if (auth) {
-          addAuthHeader();
-        } else {
-          $cordovaToast.showShortTop('Please authorize on settings tab!');
-          deferred.resolve(config);
-          /*
-          var loginService = $injector.get('loginService');
-          loginService.loginDjangoGoogleOauth().then(function () {
-            $cordovaToast.showShortBottom('Authorization suceeded');
+          var auth = configService.getAuthorizationBest();
+          if (auth) {
             addAuthHeader();
-          }, function () {
-            console.log('==== authorization failed! ====');
-            deferred.reject(config);
-          });
-          */
+          } else {
+            deferred.reject();
+            /*
+            var loginService = $injector.get('loginService');
+            loginService.loginDjangoGoogleOauth().then(function () {
+              $cordovaToast.showShortBottom('Authorization suceeded');
+              addAuthHeader();
+            }, function () {
+              console.log('==== authorization failed! ====');
+              deferred.reject(config);
+            });
+            */
+          }
+        } else {
+          deferred.reject();
         }
       } else {
         deferred.resolve(config);
@@ -59,12 +62,18 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
     },
 
     responseError: function(rejection) {
-      if (rejection.status === 401) {
-        $cordovaToast.showShortTop('Unauthorized, authorize through settings tab');
-      } else if (rejection.status === 404) {
-        $cordovaToast.showShortTop('Server Not Found, check server & protocal');
-      } else if (!utilService.isConnected()) {
+      if (!utilService.isConnected()) {
         $cordovaToast.showShortTop('No Connectivity');
+      } else if (!configService.getServerURL()) {
+        $cordovaToast.showShortTop('Server Not Specified, please specify through settings tab');
+      } else if (!configService.getAuthorizationBest()) {
+        $cordovaToast.showShortTop('Missing Authorization, please authorize through settings tab');
+      } else if (rejection.status === 401) {
+        $cordovaToast.showShortTop('Unauthorized, please check authorization through settings tab');
+      } else if (rejection.status === 404) {
+        $cordovaToast.showShortTop('Server Not Found, please check server & protocol on settings tab ');
+      } else if (rejection.status === 0) {
+        $cordovaToast.showShortTop('Error, please check server & protocol on settings tab ');
       } else {
         var msg = 'Error Performing Request.';
         if (typeof rejection !== 'undefined' && rejection &&
@@ -177,15 +186,20 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
     options.fileKey = 'file';
     options.fileName = filename;
     options.headers = {
-      'Content-Type': undefined,
-      'Authorization': configService.getAuthorizationApiKey()
+      'Authorization': configService.getAuthorizationBest()
     };
-    $cordovaFileTransfer.upload(url, filePath, options).then(function(response) {
-      deferred.resolve(response);
-    }, function(e) {
-      console.log('----[ uploadMedia.$cordovaFileTransfer error. http_status: ', e.http_status, e);
-      utilService.notify('failed to a media: ' + filename);
-      deferred.reject(e);
+    var fileInfo = utilService.getFilePathComponents(filePath);
+    $cordovaFile.checkFile(fileInfo.dir, fileInfo.filename).then(function(){
+      $cordovaFileTransfer.upload(url, filePath, options).then(function(response) {
+        deferred.resolve(response);
+      }, function(e) {
+        console.log('----[ uploadMedia.$cordovaFileTransfer error. http_status: ', e.http_status, e);
+        utilService.notify('failed to upload a media: ' + filename);
+        deferred.reject(e);
+      });
+    }, function() {
+      utilService.notify('media not found: ' + filename);
+      deferred.reject('media not found');
     });
 
     return deferred.promise;
@@ -197,10 +211,7 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
     report = JSON.stringify(report);
     console.log('----[ posintg report: ', report );
     $http.post(configService.getReportURL(), report, {
-      transformRequest: angular.identity,
-      headers: {
-        'Authorization': configService.getAuthorizationApiKey()
-      }
+      transformRequest: angular.identity
     }).then(function() {
       deferred.resolve();
     }, function(e) {
@@ -381,43 +392,37 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
 })
 
 .service('loginService', function($http, $q, configService, $cordovaToast, $filter, $cordovaOauth) {
-  this.login = function (username, password) {
+  this.loginDjango = function (username, password) {
     var deferred = $q.defer();
-    $http.get(configService.getAuthenticationURL(),
+
+    configService.resetAuthorizationApiKey();
+
+    var onSuccess = function() {
+      console.log('----[ django basic auth log in worked');
+      configService.saveConfig();
+      deferred.resolve();
+    };
+
+    var onError = function(e) {
+      console.log('------ django basic auth error', e);
+      deferred.reject();
+    };
+
+    $http.get(configService.getAuthenticationURLBasicAuth(),
       {
         "headers": {
           "Content-Type": ''
-        },
-        "timeout": 3000
+          // interceptor will add username pass basic auth since apikey was reset
+        }
       }).then(
       function(result) {
         console.log('------ login success: ', result);
         if (result.status === 200) {
-          deferred.resolve();
+          onSuccess();
         } else {
-          deferred.reject(result);
+          onError();
         }
-      }, function(error) {
-        console.log('------ login error: ', error);
-        if (error) {
-          // Note: 401 will NOT occure when endpoint is basic auth and invalid creds are used. That's when basic auth
-          //       dialog is supposed to come up which does not on mobile browser so the request stays active until
-          //       timeout is reached. this is why we are using a short timeout for this request and catching status 0
-          //       assuming that it is the bad credentials.
-          //       When the server ip is invalid, timeout will occur as well. not possible to know when
-          //TODO: make server return custom header instead of the basicauth prompt
-          if (error.status === 401 || error.status === 0) {
-            $cordovaToast.showShortBottom(($filter('translate')('error_invalid_credentials')));
-          } else if (error.status === 404) {
-            $cordovaToast.showShortBottom(($filter('translate')('error_server_not_found')));
-          } else {
-            $cordovaToast.showShortBottom($filter('translate')('error_connecting_server') + ', ' + error.status + ": " + error.description);
-          }
-        } else {
-          $cordovaToast.showShortBottom($filter('translate')('error_connecting_server'));
-        }
-        deferred.reject();
-      });
+      }, onError);
     return deferred.promise;
   };
 
@@ -426,7 +431,7 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
 
     $.ajax({
       type: 'GET',
-      url: configService.getAuthenticationURL(),
+      url: configService.getAuthenticationURLBasicAuth(),
 
       // ****************        syncronous call!        *****************
       // with basic auth, when the credentials are wrong, the app doesn't get a 401 as the 'browser'/webview is supposed
@@ -463,14 +468,14 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
     return deferred.promise;
   };
 
-  this.loginDjangoGoogleOauth = function() {
+  this.loginGoogle = function() {
     var deferred = $q.defer();
     $cordovaOauth.google(configService.getConfig().google.client_id, configService.getConfig().google.scopes).then(function(result) {
       console.log("----[ google oauth: ", result);
       configService.getConfig().google.access_token = result.access_token;
-      $http.get(configService.getAuthenticationURL() , {
+      $http.get(configService.getAuthenticationURLApiKey() , {
         headers: {
-          access_token: configService.getConfig().access_token
+          access_token: configService.getConfig().google.access_token
         }
       }).then(function(res){
         console.log('----[ django api key: ', res);
@@ -644,7 +649,7 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
   var initialConfig_ = {
     //serverURL: '192.168.33.15',
     //serverURL: 'flintlock-load-balancer-521350804.eu-central-1.elb.amazonaws.com',
-    serverURL: 'cop.imagerytool.net',
+    serverURL: null,
     username: null,
     password: null,
     protocol: {
@@ -700,11 +705,12 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
     return config_;
   };
 
-  this.resetAuthorizationConfig = function() {
-    var initConfigClone = $.extend({}, initialConfig_);
-    config_.username = initConfigClone.username;
-    config_.google = initConfigClone.google;
-    config_.django = initConfigClone.django;
+  this.resetAuthorizationApiKey = function() {
+    config_.django.apikey = null;
+  };
+
+  this.resetAuthorizationBasicAuth = function() {
+    config_.password = null;
   };
 
   this.getAuthorizationBasicAuth = function() {
@@ -716,6 +722,23 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
       return 'ApiKey ' + config_.username + ':' + config_.django.apikey;
     }
     return null;
+  };
+
+  this.getAuthorizationBest = function() {
+    if (config_ && config_.username) {
+      if (config_.django.apikey) {
+        return service_.getAuthorizationApiKey();
+      } else if(config_.password) {
+        return service_.getAuthorizationBasicAuth();
+      } else {
+        return null;
+      }
+    }
+    return null;
+  };
+
+  this.getServerURL = function() {
+    return config_.serverURL;
   };
 
   this.getTrackURL = function() {
@@ -734,8 +757,12 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
     return config_.protocol.value + '://' + config_.serverURL + '/api/v1/fileservice/';
   };
 
-  this.getAuthenticationURL = function() {
+  this.getAuthenticationURLApiKey = function() {
     return config_.protocol.value + '://' + config_.serverURL + '/mobile/authorize/';
+  };
+
+  this.getAuthenticationURLBasicAuth = function() {
+    return service_.getFormURL();
   };
 
 })
@@ -946,7 +973,7 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
     return deferred.promise;
   };
 
-  // insert value with by generating a unique key that doesn't exist in the table.
+  // insert value by generating a unique key that doesn't exist in the table.
   this.insertValue = function(tableName, value) {
     var key = utilService.getSHA1(value, true);
     return service_.setKey(tableName, key, value, /* rejectIfKeyExists */ true);
