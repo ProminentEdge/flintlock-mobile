@@ -1,16 +1,19 @@
 <ion-view title="{{formService.getCurrentForm().schema.title}}">
   <ion-content padding="true" >
     <form>
-      <div class="item item-input" ng-class="{'item-select': prop.enum}"
+      <div class="item" ng-class="{'item-select': prop.enum, 'item-input': prop.type !== 'textarea', 'item-input-text': prop.type === 'textarea'}"
            ng-if="propName !== 'photos'"
            ng-repeat="(propName, prop) in formService.getCurrentForm().schema.properties">
-        <span class="input-label">{{propName}}:</span>
+        <span class="input-label" style="float: left;">{{propName}}:</span>
 
         <a ng-if="prop.description" class="button button-icon ion-ios-information-outline"
            ng-click="showHint(prop.description)"></a>
 
         <input ng-if="prop.type === 'string' && !prop.enum" type="text" placeholder="{{prop.description}}" ng-model="report[propName]"
                autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+
+        <textarea ng-if="prop.type === 'textarea'" update-height-on-change style="width: 100%;" placeholder="{{prop.description}}" ng-model="report[propName]"
+                  autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
 
         <select ng-if="prop.enum" id="injury" ng-model="report[propName]">
           <option value="" > -- choose -- </option>>
