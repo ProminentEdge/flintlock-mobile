@@ -39,7 +39,13 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
           if (auth) {
             addAuthHeader();
           } else {
-            deferred.reject();
+            // allow the request go through without automatically attaching auth header / throwing an error
+            if (config.headers && config.headers.skipInterceptorAuthCheck) {
+              delete config.skipInterceptorAuthCheck;
+              deferred.resolve(config);
+            } else {
+              deferred.reject();
+            }
             /*
             var loginService = $injector.get('loginService');
             loginService.loginDjangoGoogleOauth().then(function () {
@@ -475,6 +481,8 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
       configService.getConfig().google.access_token = result.access_token;
       $http.get(configService.getAuthenticationURLApiKey() , {
         headers: {
+          skipInterceptorAuthCheck: true, // app specific to avoid throwing an error when there is no valid
+                                          // Authorize header can be added based on configService.getAuthorizationBest()
           access_token: configService.getConfig().google.access_token
         }
       }).then(function(res){
