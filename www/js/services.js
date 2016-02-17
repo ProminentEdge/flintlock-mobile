@@ -713,12 +713,26 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
     return config_;
   };
 
+  this.resetAuthorizationConfig = function() {
+    service_.resetAuthorizationGoogle();
+    service_.resetAuthorizationApiKey();
+    service_.resetAuthorizationBasicAuth();
+  };
+
+  this.resetAuthorizationGoogle = function() {
+    var initConfigClone = $.extend({}, initialConfig_);
+    config_.google = initConfigClone.google;
+  };
+
   this.resetAuthorizationApiKey = function() {
-    config_.django.apikey = null;
+    var initConfigClone = $.extend({}, initialConfig_);
+    config_.django = initConfigClone.django;
   };
 
   this.resetAuthorizationBasicAuth = function() {
-    config_.password = null;
+    var initConfigClone = $.extend({}, initialConfig_);
+    config_.username = initConfigClone.username;
+    config_.password = initConfigClone.password;
   };
 
   this.getAuthorizationBasicAuth = function() {
