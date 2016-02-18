@@ -5,7 +5,7 @@
 VIDA uses [Ionic Framework](1)  but before you can insatll Ionic, you need to have Node Package Manager ```npm``` and ```bower```. 
 To install npm you can install it from (we've tested with this version):
 ```
-https://nodejs.org/dist/v0.12.0/node-v0.12.9.pkg
+https://nodejs.org/dist/v0.12.9/node-v0.12.9.pkg
 ```
 
 To install bower:
