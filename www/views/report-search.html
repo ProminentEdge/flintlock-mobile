@@ -1,0 +1,27 @@
+<ion-view title="{{'title_reports' | translate}}">
+  <ion-pane>
+    <ion-content padding="false" class="has-header">
+      <div class="item item-input-inset">
+        <label class="item-input-wrapper margin-right-8px" name="search-people">
+          <i class="icon ion-search placeholder-icon"></i>
+          <input type="search" id="searchText" ng-model="searchText" ng-model-options='{debounce: 700}' ng-change='searchPerson(searchText)'
+                 style="" placeholder="{{'search_searchfield' | translate}}">
+        </label>
+      </div>
+      <ion-list>
+        <div ng-repeat="report in reportService.get()">
+          <ion-item class="item-thumbnail-left" href="#/vida/report-search/report-detail/{{$index}}">
+            <!--
+            <img ng-if="report.pic_filename !== 'undefined'" ng-src="{{networkService.getFileServiceURL()}}{{report.pic_filename}}/download/"
+                 err-src="{{peopleService.getPlaceholderImage()}}"
+                 id="report.photo" ng-model="report.photo">
+            <img ng-if="report.pic_filename === 'undefined'" ng-src="{{peopleService.getPlaceholderImage()}}">
+            -->
+            <h2>{{formService.getById(formService.uriToId(report.form)).schema.title}}</h2>
+            <h2>hiii</h2>
+          </ion-item>
+        </div>
+      </ion-list>
+    </ion-content>
+  </ion-pane>
+</ion-view>

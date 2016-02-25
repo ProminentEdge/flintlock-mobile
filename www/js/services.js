@@ -133,10 +133,9 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
   };
 }])
 
-
-//TODO: report service should have load [db], save [db], pull [server], push [server]. it should use a new fileService
+//TODO: report service should have get [db] ,  pull [server], push [server]. it should use a new fileService
 //      for media etc. fileService should have save, load, pull, push as well.
-.service('reportService', function($http, configService, $q, geolocationService, $cordovaFileTransfer, localDBService,
+.service('mediaService', function($http, configService, $q, geolocationService, $cordovaFileTransfer, localDBService,
                                    utilService, $cordovaFile) {
   var service_ = this;
 
@@ -177,9 +176,9 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
       localDBService.removeKey('media', fileHash).then(function () {
         var localFileInfo = utilService.getFilePathComponents(filePath);
         $cordovaFile.removeFile(localFileInfo.dir, localFileInfo.filename).then(function(){
-            console.log('----[ uploadMedia & removing completed for: ', fileHash, filePath);
+          console.log('----[ uploadMedia & removing completed for: ', fileHash, filePath);
           deferred.resolve(response);
-          }, onError);
+        }, onError);
       }, onError);
     }, onError);
 
@@ -210,7 +209,44 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
 
     return deferred.promise;
   };
+})
 
+.service('reportService', function($http, configService, $q, geolocationService, localDBService,
+                                   utilService, mediaService) {
+  var service_ = this;
+  var reports_ = [];
+
+  this.get = function() {
+    return reports_;
+  };
+
+  this.load = function() {
+    var deferred = $q.defer();
+    localDBService.getAllRows('reports').then(function (result) {
+      var reports = localDBService.getAllRowsValues(result, true);
+      reports_ = reports;
+      deferred.resolve(reports_);
+    }, function() {
+      deferred.reject();
+    });
+    return deferred.promise;
+  };
+
+  this.save = function(report) {
+    console.log('----[ save: ', report);
+    var deferred = $q.defer();
+
+    localDBService.insertValue('reports', report).then(function() {
+      reports_.push(report);
+      deferred.resolve(reports_);
+    }, function () {
+      deferred.reject();
+    });
+
+    return deferred.promise;
+  };
+
+  // TODO: rename to push and it shouldn't take any params. move some of the code from sync here
   this.uploadReport = function(report) {
     var deferred = $q.defer();
     delete report.timestamp_local; // is was a temp key not meant for server
@@ -509,6 +545,8 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
 .service('formService', function($http, $q, configService, $resource, localDBService) {
   var service_ = this;
   var forms_ = [];
+
+  //TODO: remove current form let each controller controller use its own
   var currentForm_ = null;
 
   this.pullFroms = function() {
@@ -531,8 +569,15 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
 
   this.getById = function(id) {
     for(var i = 0; i < forms_.length; i++) {
-      if (forms_[i].id == id)
+      if (i === id)
         return forms_[i];
+    }
+  };
+
+  this.uriToId = function(uri) {
+    for(var i = 0; i < forms_.length; i++) {
+      if (forms_[i].resource_uri === uri)
+        return i;
     }
   };
 
@@ -541,6 +586,10 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
   };
 
   this.setCurrentForm = function(id) {
+    currentForm_ = forms_[id];
+  };
+
+  this.setCurrentFormById = function(id) {
     currentForm_ = forms_[id];
   };
 

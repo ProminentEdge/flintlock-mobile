@@ -115,7 +115,7 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
 
 .controller('SettingsCtrl', function($scope, $location, configService, $translate, $cordovaOauth, $ionicPopup,
                                      localDBService, $rootScope, $cordovaToast, $cordovaInAppBrowser, loginService,
-                                     $http, $state, reportService, utilService){
+                                     $http, $state, reportService, utilService, mediaService){
   console.log('---------------------------------- SettingsCtrl');
 
   $scope.configService = configService;
@@ -246,7 +246,7 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
             template: 'Push the ' + count + ' media as opposed to a full sync?'
           }).then(function (res) {
             if (res) {
-              reportService.pushMedia().then(onSuccess, onError);
+              mediaService.pushMedia().then(onSuccess, onError);
             } else {
               onError();
             }
@@ -371,7 +371,7 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
 })
 
 .controller('ReportCreateCtrl', function($scope, $rootScope, $q, $stateParams, formService, $cordovaToast, $filter,
-                                         localDBService, utilService, reportService, configService){
+                                         localDBService, utilService, reportService, mediaService, configService){
   console.log("---- ReportCreateCtrl");
   $scope.configService = configService;
   $scope.isLoading = false;
@@ -432,7 +432,7 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
                   utilService.notify('Sync Completed.');
                 };
 
-                reportService.pushMedia().then(function(){
+                mediaService.pushMedia().then(function(){
                   mediaCompleted();
                 }, function(resp){
                   utilService.notify('Media push failed. ' + resp.succeeded.length + ' of ' + resp.failed.length + ' succeeded.');
@@ -468,10 +468,30 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
                                          $cordovaFileTransfer){
   console.log("---- ReportDetailCtrl");
   $scope.formService = formService;
-  $scope.report = {};
+  $scope.report = null;
   $scope.mediaPendingUploadMap = {};
+  $scope.createNewReportMode = null;
 
-  formService.setCurrentForm($stateParams.reportId);
+  // only when creating a new report, formId will be passed in
+  if ($stateParams.formId) {
+    $scope.createNewReportMode = true;
+  } else if ($stateParams.reportId) {
+    $scope.createNewReportMode = false;
+  }
+
+  if ($scope.createNewReportMode) {
+    formService.setCurrentForm($stateParams.formId);
+    $scope.report = {
+      'data': {},
+      'status': 'SUBMITTED',
+      'form': formService.getCurrentForm().resource_uri,
+      'timestamp_local': null, // not sent to the server
+      'geom': null
+    };
+  } else if ($stateParams.reportId) {
+    $scope.report = reportService.get()[$stateParams.reportId];
+    formService.setCurrentForm(formService.uriToId($scope.report.form));
+  }
 
   // iOS:  store pics in temp folder needs to be moved to application folder
   // Android: pics from library have uri 'content://....' format
@@ -481,13 +501,13 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
 
     var processAddMedia = function(filePath) {
       console.log('----[ processAddMedia, filePath: ', filePath);
-      if (($scope.report[$scope.getMediaPropName()] instanceof Array) === false) {
-        $scope.report[$scope.getMediaPropName()] = [];
+      if (($scope.report.data[$scope.getMediaPropName()] instanceof Array) === false) {
+        $scope.report.data[$scope.getMediaPropName()] = [];
       }
       utilService.getFileAsBinaryString(filePath, false).then( function(result) {
         var filenameSha1 = utilService.getSHA1(result) + '.jpg';
         $scope.mediaPendingUploadMap[filenameSha1] = filePath;
-        $scope.report[$scope.getMediaPropName()].push(filenameSha1);
+        $scope.report.data[$scope.getMediaPropName()].push(filenameSha1);
         deferred.resolve();
         console.log('----[ filenameSha1: ', filenameSha1);
       }, function(err) {
@@ -538,13 +558,13 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
 
     var processAddMedia = function(filePath) {
       console.log('----[ processAddMedia, filePath: ', filePath);
-      if (($scope.report[$scope.getMediaPropName()] instanceof Array) === false) {
-        $scope.report[$scope.getMediaPropName()] = [];
+      if (($scope.report.data[$scope.getMediaPropName()] instanceof Array) === false) {
+        $scope.report.data[$scope.getMediaPropName()] = [];
       }
       utilService.getFileAsBinaryString(filePath, false).then( function(result) {
         var filenameSha1 = utilService.getSHA1(result) + '.jpg';
         $scope.mediaPendingUploadMap[filenameSha1] = filePath;
-        $scope.report[$scope.getMediaPropName()].push(filenameSha1);
+        $scope.report.data[$scope.getMediaPropName()].push(filenameSha1);
         deferred.resolve();
         console.log('----[ filenameSha1: ', filenameSha1);
       }, function(err) {
@@ -614,21 +634,17 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
     geolocationService.getCurrentPosition().then(function(position) {
       $cordovaProgress.hide();
       $cordovaProgress.showSimpleWithLabelDetail(true, "Saving", "Saving report to local DB");
-      var payload = {
-        'timestamp_local': new Date(),   // help make the object and hense the hash unique
-        'data': $scope.report,
-        'status': 'SUBMITTED',
-        'geom': {
-          'coordinates': [
-            position.coords.longitude,
-            position.coords.latitude
-          ],
-          'type': 'Point'
-        },
-        'form': formService.getCurrentForm().resource_uri
+      // prepare the report
+      $scope.report.timestamp_local = new Date(); // help make the object and hense the hash unique
+      $scope.report.geom = {
+        'coordinates': [
+          position.coords.longitude,
+          position.coords.latitude
+        ],
+        'type': 'Point'
       };
 
-      localDBService.insertValue('reports', payload).then(function() {
+      reportService.save($scope.report).then(function() {
         //TODO: implement foreachWaitForCompletionAsync such that it can call setKey and pass all arguments to it
         var promises = [];
         for (var key in $scope.mediaPendingUploadMap) {
@@ -722,14 +738,10 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
   };
 })
 
-.controller('WebsiteCtrl', function($scope, $cordovaInAppBrowser){
-  console.log("---- WebsiteCtrl");
-
-  $scope.go = function() {
-    $cordovaInAppBrowser.open('https://sites.google.com/a/flintlock.net/flintlock16dev/', '_system', {
-      location: 'yes'
-    });
-  };
+.controller('ReportSearchCtrl', function($scope, reportService, formService){
+  console.log("---- ReportSearchCtrl");
+  $scope.reportService = reportService;
+  $scope.formService = formService;
 })
 
 .controller('ShelterSearchCtrl', function ($rootScope, $scope, $state, shelterService) {

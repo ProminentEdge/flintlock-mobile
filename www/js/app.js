@@ -11,7 +11,7 @@ angular.module('vida', ['ionic', 'ngCordova', 'vida.directives', 'vida.controlle
     'pascalprecht.translate', 'vida-translations-en', 'vida-translations-es', 'ngResource', 'angularMoment', 'ngCordovaOauth'])
 
 .run(function($q, $ionicPlatform, $window, $cordovaSQLite, configService, localDBService, $cordovaToast, formService,
-              $rootScope) {
+              $rootScope, reportService) {
   $ionicPlatform.ready(function() {
     // Hide the accessory bar by default (remove this to show the accessory bar above the keyboard
     // for form inputs).
@@ -54,6 +54,7 @@ angular.module('vida', ['ionic', 'ngCordova', 'vida.directives', 'vida.controlle
           var promises = [];
           promises.push(configService.loadConfig());
           promises.push(formService.loadForms());
+          promises.push(reportService.load());
           $q.all(promises).then(function(){
             console.log('Forms: ', formService.getForms());
             $cordovaToast.showLongTop('config & forms loaded');
@@ -130,13 +131,6 @@ angular.module('vida', ['ionic', 'ngCordova', 'vida.directives', 'vida.controlle
   // Each state's controller can be found in controllers.js
   $stateProvider
 
-  .state('login', {
-    url: '/login',
-    templateUrl: 'views/login.html',
-    controller: 'loginCtrl'
-  })
-
-
     // setup an abstract state for the vida directive
   .state('vida', {
     url: "/vida",
@@ -162,16 +156,36 @@ angular.module('vida', ['ionic', 'ngCordova', 'vida.directives', 'vida.controlle
     url: '/report-create',
     views: {
       'view-report-create': {
-        templateUrl: 'views/reports.html',
+        templateUrl: 'views/report-create.html',
         controller: 'ReportCreateCtrl'
       }
     }
   })
 
-  .state('vida.report-create.report-detail', {
-    url: '/report-detail/:reportId',
+  .state('vida.report-create.report-detail-new', {
+    url: '/report-detail-new/:formId',
     views: {
       'view-report-create@vida': {
+        templateUrl: 'views/report-detail.html',
+        controller: 'ReportDetailCtrl'
+      }
+    }
+  })
+
+  .state('vida.report-search', {
+    url: '/report-search',
+    views: {
+      'view-website': {
+        templateUrl: 'views/report-search.html',
+        controller: 'ReportSearchCtrl'
+      }
+    }
+  })
+
+  .state('vida.report-search.report-detail', {
+    url: '/report-detail/:reportId',
+    views: {
+      'view-report-search@vida': {
         templateUrl: 'views/report-detail.html',
         controller: 'ReportDetailCtrl'
       }
@@ -184,36 +198,6 @@ angular.module('vida', ['ionic', 'ngCordova', 'vida.directives', 'vida.controlle
       'view-settings': {
         templateUrl: 'views/settings.html',
         controller: 'SettingsCtrl'
-      }
-    }
-  })
-
-  .state('vida.website', {
-    url: '/website',
-    views: {
-      'view-website': {
-        templateUrl: 'views/website.html',
-        controller: 'WebsiteCtrl'
-      }
-    }
-  })
-
-  .state('vida.shelter-search', {
-    url: '/shelter-search',
-    views: {
-      'view-shelter-search': {
-        templateUrl: 'views/shelter-search.html',
-        controller: 'ShelterSearchCtrl'
-      }
-    }
-  })
-
-  .state('vida.shelter-search.shelter-detail', {
-    url: '/shelter-detail/:shelterId',
-    views: {
-      'view-shelter-search@vida': {
-        templateUrl: 'views/shelter-detail.html',
-        controller: 'ShelterDetailCtrl'
       }
     }
   });

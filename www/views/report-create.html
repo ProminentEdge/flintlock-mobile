@@ -32,8 +32,8 @@
         <div class="item item-divider">
           Create Report
         </div>
-        <a class="item item-icon-right" ng-repeat="(key, value) in formService.getForms()" href="#/vida/report-create/report-detail/{{key}}">
-          {{value.schema.title}}
+        <a class="item item-icon-right" ng-repeat="(formId, form) in formService.getForms()" href="#/vida/report-create/report-detail-new/{{formId}}">
+          {{form.schema.title}}
           <i class="icon ion-chevron-right icon-accessory"></i>
         </a>
       </ion-list>
