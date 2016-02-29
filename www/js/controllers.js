@@ -472,6 +472,7 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
   $scope.report = null;
   $scope.mediaPendingUploadMap = {};
   $scope.createNewReportMode = null;
+  $scope.reportOriginalHash = null;   // when in edit mode, get report's hash before it is canged
 
   // only when creating a new report, formId will be passed in
   if (typeof $stateParams.formId !== 'undefined') {
@@ -486,7 +487,8 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
     formService.setCurrentForm($stateParams.formId);
   } else {
     $scope.report = reportService.get()[$stateParams.reportId];
-    formService.setCurrentForm(formService.getByUri($scope.report.form));
+    formService.setCurrentForm(formService.uriToId($scope.report.form));
+    $scope.reportOriginalHash = utilService.getSHA1($scope.report, true);
   }
 
   // iOS:  store pics in temp folder needs to be moved to application folder
@@ -547,7 +549,7 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
       $cordovaProgress.hide();
       $cordovaProgress.showSimpleWithLabelDetail(true, "Saving", "Saving report to local DB");
       // prepare the report
-      $scope.report.timestamp_local = new Date(); // help make the object and hense the hash unique
+      $scope.report.timestamp_local = new Date(); // help make the object and hence the hash unique
       $scope.report.geom = {
         'coordinates': [
           position.coords.longitude,
@@ -567,7 +569,7 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
           $cordovaProgress.hide();
           $rootScope.$broadcast('updateBadge');
           utilService.notify("Report saved to local db");
-          $state.go('vida.report-create');
+          $state.go('^');
         },
         function(){
           utilService.notify("failed to save media to local db: " + key);
