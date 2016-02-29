@@ -175,7 +175,7 @@ angular.module('vida', ['ionic', 'ngCordova', 'vida.directives', 'vida.controlle
   .state('vida.report-search', {
     url: '/report-search',
     views: {
-      'view-website': {
+      'view-report-search': {
         templateUrl: 'views/report-search.html',
         controller: 'ReportSearchCtrl'
       }

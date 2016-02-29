@@ -468,55 +468,34 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
                                          $cordovaFileTransfer){
   console.log("---- ReportDetailCtrl");
   $scope.formService = formService;
+  $scope.reportService = reportService;
   $scope.report = null;
   $scope.mediaPendingUploadMap = {};
   $scope.createNewReportMode = null;
 
   // only when creating a new report, formId will be passed in
-  if ($stateParams.formId) {
+  if (typeof $stateParams.formId !== 'undefined') {
     $scope.createNewReportMode = true;
-  } else if ($stateParams.reportId) {
+  } else if (typeof $stateParams.reportId !== 'undefined') {
     $scope.createNewReportMode = false;
   }
 
   if ($scope.createNewReportMode) {
+    var form = formService.getById($stateParams.formId);
+    $scope.report = reportService.getNew(form);
     formService.setCurrentForm($stateParams.formId);
-    $scope.report = {
-      'data': {},
-      'status': 'SUBMITTED',
-      'form': formService.getCurrentForm().resource_uri,
-      'timestamp_local': null, // not sent to the server
-      'geom': null
-    };
-  } else if ($stateParams.reportId) {
+  } else {
     $scope.report = reportService.get()[$stateParams.reportId];
-    formService.setCurrentForm(formService.uriToId($scope.report.form));
+    formService.setCurrentForm(formService.getByUri($scope.report.form));
   }
 
   // iOS:  store pics in temp folder needs to be moved to application folder
   // Android: pics from library have uri 'content://....' format
   $scope.addMedia = function(tempFilePath) {
     var deferred = $q.defer();
-    console.log('----[ addMedia, tempfile: ', tempFilePath);
-
-    var processAddMedia = function(filePath) {
-      console.log('----[ processAddMedia, filePath: ', filePath);
-      if (($scope.report.data[$scope.getMediaPropName()] instanceof Array) === false) {
-        $scope.report.data[$scope.getMediaPropName()] = [];
-      }
-      utilService.getFileAsBinaryString(filePath, false).then( function(result) {
-        var filenameSha1 = utilService.getSHA1(result) + '.jpg';
-        $scope.mediaPendingUploadMap[filenameSha1] = filePath;
-        $scope.report.data[$scope.getMediaPropName()].push(filenameSha1);
-        deferred.resolve();
-        console.log('----[ filenameSha1: ', filenameSha1);
-      }, function(err) {
-        deferred.reject(err);
-        console.log('---[ error. failed to get media file binary data: ', err);
-      });
-    };
-
+    console.log('----[ addMedia, report: ', $scope.report, ', tempfile: ', tempFilePath);
     console.log('----[ platform.ionic: ', ionic.Platform.isIOS());
+
     $window.resolveLocalFileSystemURL(tempFilePath, function(fileSystem) {
       console.log('tempFilePath fileSystem: ', fileSystem);
       // iOS: uri returned from camera / library points to a file in tmp folder which will be removed when
@@ -528,97 +507,30 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
       //
       // Other option is to just get teh image as base64 encoded string from 'camera' (DATA_URL) and write a file.
       if (tempFilePath.indexOf('content://') !== 0) {
+        // read the file and compute the file name using sha1
+        utilService.getFileAsBinaryString(tempFilePath, false).then(function(result) {
+          var filenameSha1 = utilService.getSHA1(result) + '.jpg';
+
           //Move the temp file to permanent storage
-        var localFileInfo = utilService.getFilePathComponents(tempFilePath);
-        var newFilename = (new Date()).getTime() + ".jpg";
-        $cordovaFile.copyFile(localFileInfo.dir, localFileInfo.filename, cordova.file.dataDirectory, newFilename)
-          .then(function(success){
-            processAddMedia(success.nativeURL);
+          var localFileInfo = utilService.getFilePathComponents(tempFilePath);
+          $cordovaFile.copyFile(localFileInfo.dir, localFileInfo.filename,
+            cordova.file.dataDirectory, filenameSha1).then(function(success){
+            console.log('----[ media added: ', success.nativeURL);
+            $scope.mediaPendingUploadMap[filenameSha1] = success.nativeURL;
+            $scope.report.data[formService.getMediaPropName(formService.getCurrentForm())].push(filenameSha1);
+            deferred.resolve();
           }, function(error){
             deferred.reject(error);
-            utilService.notify('Failed to move media to permanent storage: ' + error);
+            utilService.notify('Failed to copy media to permanent storage: ' + error);
           });
+        }, function(err) {
+          deferred.reject(err);
+          console.log('---[ error. failed to get media file binary data: ', err);
+        });
       } else {
         deferred.reject('not supported');
         utilService.notify('Cannot use file from library on this version of the OS');
       }
-    }, function(e) {
-      console.log('fileSystem failed. e ', e);
-      deferred.reject(e);
-    });
-
-    return deferred.promise;
-  };
-
-  $scope.addMediaFix = function(tempFilePath) {
-    var deferred = $q.defer();
-    console.log('----[ addMedia, tempfile: ', tempFilePath);
-    //tempFilePath = tempFilePath.replace("%", "%25");
-    //console.log('----[ addMedia, r##$#$#$#$#$#$#$##$ replacing% with %25: ', tempFilePath);
-
-    var processAddMedia = function(filePath) {
-      console.log('----[ processAddMedia, filePath: ', filePath);
-      if (($scope.report.data[$scope.getMediaPropName()] instanceof Array) === false) {
-        $scope.report.data[$scope.getMediaPropName()] = [];
-      }
-      utilService.getFileAsBinaryString(filePath, false).then( function(result) {
-        var filenameSha1 = utilService.getSHA1(result) + '.jpg';
-        $scope.mediaPendingUploadMap[filenameSha1] = filePath;
-        $scope.report.data[$scope.getMediaPropName()].push(filenameSha1);
-        deferred.resolve();
-        console.log('----[ filenameSha1: ', filenameSha1);
-      }, function(err) {
-        deferred.reject(err);
-        console.log('---[ error. failed to get media file binary data: ', err);
-      });
-    };
-
-    console.log('----[ platform.ionic: ', ionic.Platform.isIOS());
-    $window.resolveLocalFileSystemURL(tempFilePath, function(theFile) {
-      console.log('tempFilePath fileSystem: ', theFile);
-      console.log('tempFilePath fileSystem toURL: ', theFile.toURL());
-      console.log('tempFilePath fileSystem toInternalURL: ', theFile.toInternalURL());
-      console.log('tempFilePath fileSystem nativeURL: ', theFile.nativeURL);
-
-      // they say this works:
-      // http://stackoverflow.com/questions/10335563/capturing-and-storing-a-picture-taken-with-the-camera-into-a-local-database-ph
-
-      var newFilename = (new Date()).getTime() + ".jpg";
-      var destDirname = "media_fl";
-
-      $window.requestFileSystem(LocalFileSystem.PERSISTENT, 0, function(fileSys) {
-        fileSys.root.getDirectory( destDirname, {
-          create:true,
-          exclusive: false
-        },
-        function(directory) {
-          if (theFile.nativeURL.indexOf('content://') === 0) {
-            var downloadedFilename = directory.nativeURL + newFilename;
-            $cordovaFileTransfer.download(theFile.nativeURL, downloadedFilename, {}, true).then(function(){
-              processAddMedia(downloadedFilename);
-            }, function(e){
-              deferred.reject(e);
-              utilService.notify('Failed to _download_ file to permanent storage: ' + e);
-            });
-          } else {
-            theFile.moveTo(directory, newFilename, function(file) {
-              processAddMedia(file.nativeURL);
-            },
-            function(e){
-              deferred.reject(e);
-              utilService.notify('Failed to move media to permanent storage: ' + e);
-            });
-          }
-        },
-        function(e){
-          deferred.reject(e);
-          utilService.notify('Failed to getDirectory: ' + e);
-        });
-      },
-      function(e){
-        deferred.reject(e);
-        utilService.notify('Failed to resolve fileSystem: ' + e);
-      });
     }, function(e) {
       console.log('fileSystem failed. e ', e);
       deferred.reject(e);
@@ -675,16 +587,7 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
     });
   };
 
-  $scope.hasMedia = function() {
-    return typeof $scope.getMediaPropName() != 'undefined';
-  };
 
-  $scope.getMediaPropName = function() {
-    if ('photos' in formService.getCurrentForm().schema.properties)
-      return 'photos';
-    if ('Photos' in formService.getCurrentForm().schema.properties)
-      return 'Photos';
-  };
 
   $scope.showCameraModal = function() {
     var prevPicture = false;

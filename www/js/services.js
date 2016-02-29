@@ -211,8 +211,7 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
   };
 })
 
-.service('reportService', function($http, configService, $q, geolocationService, localDBService,
-                                   utilService, mediaService) {
+.service('reportService', function($http, configService, $q, geolocationService, localDBService, formService) {
   var service_ = this;
   var reports_ = [];
 
@@ -261,6 +260,44 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
     });
     return deferred.promise;
   };
+
+  this.hasMedia = function(report) {
+    var media = service_.getMedia(report);
+    return media && media.length > 0;
+  };
+
+  this.getMedia = function(report) {
+    var form = formService.getByUri(report.form);
+    return report.data[formService.getMediaPropName(form)];
+  };
+
+  this.getMediaFilePathByIndex = function(report, index) {
+    var media = service_.getMedia(report);
+    return cordova.file.dataDirectory + media[index];
+  };
+
+  this.getMediaFilePathByMediaHash = function(report, mediaHash) {
+    var media = service_.getMedia(report);
+    for(var i = 0; i < media.length; i++) {
+      if (media[i] === mediaHash)
+        return service_.getMediaFilePathByIndex(report, i);
+    }
+  };
+
+  this.getNew = function(form) {
+    var report = {
+      'data': {},
+      'status': 'SUBMITTED',
+      'form': form.resource_uri,
+      'timestamp_local': null, // not sent to the server
+      'geom': null
+    };
+    if (formService.getMediaPropName(form)) {
+      report.data[formService.getMediaPropName(form)] = [];
+    }
+    return report;
+  };
+
 })
 
 .service('utilService', function($cordovaFile, $q, $cordovaToast) {
@@ -569,7 +606,14 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
 
   this.getById = function(id) {
     for(var i = 0; i < forms_.length; i++) {
-      if (i === id)
+      if (i == id) // accept int or string
+        return forms_[i];
+    }
+  };
+
+  this.getByUri = function(uri) {
+    for(var i = 0; i < forms_.length; i++) {
+      if (forms_[i].resource_uri === uri)
         return forms_[i];
     }
   };
@@ -631,6 +675,13 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
     localDBService.getAllRows('forms').then(function (result) {
       service_.setForms(localDBService.getAllRowsValues(result, true), false);
     });
+  };
+
+  this.getMediaPropName = function(form) {
+    if ('photos' in form.schema.properties)
+      return 'photos';
+    if ('Photos' in form.schema.properties)
+      return 'Photos';
   };
 })
 

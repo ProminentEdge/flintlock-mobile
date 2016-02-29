@@ -11,14 +11,10 @@
       <ion-list>
         <div ng-repeat="report in reportService.get()">
           <ion-item class="item-thumbnail-left" href="#/vida/report-search/report-detail/{{$index}}">
-            <!--
-            <img ng-if="report.pic_filename !== 'undefined'" ng-src="{{networkService.getFileServiceURL()}}{{report.pic_filename}}/download/"
-                 err-src="{{peopleService.getPlaceholderImage()}}"
-                 id="report.photo" ng-model="report.photo">
-            <img ng-if="report.pic_filename === 'undefined'" ng-src="{{peopleService.getPlaceholderImage()}}">
-            -->
+            <img ng-if="reportService.hasMedia(report)" ng-src="{{reportService.getMediaFilePathByIndex(report, 0)}}"
+                 err-src="{{reportService.getPlaceholderImage()}}">
+            <img ng-if="!reportService.hasMedia(report)" ng-src="{{reportService.getPlaceholderImage()}}">
             <h2>{{formService.getById(formService.uriToId(report.form)).schema.title}}</h2>
-            <h2>hiii</h2>
           </ion-item>
         </div>
       </ion-list>
