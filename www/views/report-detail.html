@@ -31,6 +31,19 @@
                err-src="{{reportService.getPlaceholderImage()}}"/>
         </ion-item>
       </ion-list>
+      <div class="item item-input-inset">
+        <span class="input-label" style="float: left;">longitude:</span>
+        <input type="text" placeholder="lon" ng-model="report.geom.coordinates[0]">
+        <span class="input-label" style="float: left;">longitude:</span>
+        <input type="text" placeholder="lat" ng-model="report.geom.coordinates[1]">
+        <!--
+        <label class="item-input-wrapper margin-right-8px">
+          <span class="input-label">{{'latitude' | translate}}</span>
+          <input type="text" placeholder="lat" ng-model="report.geom.coordinates[1]">
+        </label>
+        <button class="button button-small button-stable icon ion-pricetag" ng-click="scanBarcode()"></button>
+        -->
+      </div>
       <div>
         <button class="button button-positive button-block" ng-click="save()">{{'button_save' | translate}}</button>
       </div>

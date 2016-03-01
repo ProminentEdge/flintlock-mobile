@@ -30,87 +30,14 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
     console.log(unfoundState, fromState, fromParams);
   });
 
-  // Create the login modal that we will use later
-  //$ionicModal.fromTemplateUrl('views/modal-sample.html', {
-  //  scope: $scope
-  //}).then(function(modal) {
-  //  $scope.modal = modal;
-  //});
-
-  // Triggered in the login modal to close it
-  $scope.cancelModal = function() {
-    $scope.modal.hide();
-  };
-
-  // Open the login modal
-  $scope.modal_sample = function() {
-    $scope.modal.show();
-  };
-
-  // Perform the login action when the user submits the login form
-  $scope.okayModal = function() {
-    console.log('Doing login', $scope.loginData);
-  };
-
   $rootScope.center = {
     lat: 0,
     lng: 0,
     zoom: 0
   };
 
-  // initialize once. we will only work with this created object from now on
   $rootScope.markers = {};
 
-})
-
-.controller('PersonDetailEditCtrl', function($scope, $state, $rootScope, $stateParams, $http, shelter_array, $cordovaToast,
-                                             $filter, $cordovaActionSheet, $cordovaCamera, configService, shelterService,
-                                             $cordovaProgress) {
-  console.log('---------------------------------- PersonDetailEditCtrl');
-
-  $scope.setupSaveCancelButtons = function() {
-    // Setup tab-specific buttons
-    var tabs = document.getElementsByClassName("tab-item");
-    for (var i=0; i < tabs.length; i++) {
-      tabs[i].setAttribute('style', 'display: none;');
-    }
-
-    var editDeleteButtons = document.getElementsByClassName("button-person-edit");
-    var saveCancelButtons = document.getElementsByClassName("button-person-post-edit");
-    for (i=0; i < saveCancelButtons.length; i++) {
-      saveCancelButtons[i].setAttribute('style', 'display: block;');  // Enables buttons
-    }
-
-    $scope.$on("$destroy", function(){
-      for (var i=0; i < tabs.length; i++) {
-        tabs[i].setAttribute('style', 'display: none;');
-      }
-
-      for (i=0; i < saveCancelButtons.length; i++) {
-        saveCancelButtons[i].setAttribute('style', 'display: none;');   // Removes buttons
-      }
-
-      for (i=0; i < editDeleteButtons.length; i++) {
-        editDeleteButtons[i].setAttribute('style', 'display: block;');   // Enables buttons
-      }
-    });
-  };
-
-  $rootScope.buttonPersonCancel = function() {
-    console.log('PersonDetailCtrl - buttonPersonCancel()');
-
-    if (confirm($filter('translate')('dialog_confirm_cancel'))) {
-      window.history.back();
-    }
-  };
-
-  // Startup
-  $scope.setupSaveCancelButtons();
-  $cordovaProgress.hide();
-})
-
-.controller('ShelterSearchCtrl', function($scope, $location, $http){
-  console.log('---------------------------------- ShelterSearchCtrl');
 })
 
 .controller('SettingsCtrl', function($scope, $location, configService, $translate, $cordovaOauth, $ionicPopup,
@@ -604,8 +531,6 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
     });
   };
 
-
-
   $scope.showCameraModal = function() {
     var prevPicture = false;
     var options = {
@@ -658,100 +583,48 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
   };
 })
 
-.controller('ReportSearchCtrl', function($scope, reportService, formService){
+.controller('ReportSearchCtrl', function($scope, $rootScope, reportService, formService){
   console.log("---- ReportSearchCtrl");
   $scope.reportService = reportService;
   $scope.formService = formService;
-})
+  $scope.mapMode = false;
+  
+  var MapLayer = {};
+  var leafletDirective = angular.element(document.body).injector().get('leafletData');
 
-.controller('ShelterSearchCtrl', function ($rootScope, $scope, $state, shelterService) {
-  console.log("---- ShelterSearchCtrl");
-  shelterService.getAll().then(function(shelters) {
+  $scope.updateMarkers = function() {
     // clear the markers object without recreating it
-    for (var variableKey in $rootScope.markers){
-      if ($rootScope.markers.hasOwnProperty(variableKey)){
+    for (var variableKey in $rootScope.markers) {
+      if ($rootScope.markers.hasOwnProperty(variableKey)) {
         delete $rootScope.markers[variableKey];
       }
     }
 
-    console.log("---- got all shelters: ", shelters);
-    for (var i = 0; i < shelters.length; i++) {
-      var shelter = shelters[i];
-
-      // look for 'point' in wkt and get the pair of numbers in the string after it
-      var trimParens = /^\s*\(?(.*?)\)?\s*$/;
-      var coordinateString = shelter.geom.toLowerCase().split('point')[1].replace(trimParens, '$1').trim();
-      var tokens = coordinateString.split(' ');
-      var lng = parseFloat(tokens[0]);
-      var lat = parseFloat(tokens[1]);
-      var coord = shelterService.getLatLng(shelter.id);
-      var detailUrl = '#/vida/shelter-search/shelter-detail/' + shelter.id;
-
-      $rootScope.markers["shelter_" + shelter.id] = {
+    var reports = reportService.get();
+    for (var i = 0; i < reports.length; i++) {
+      var report = reports[i];
+      var form = formService.getById(formService.uriToId(report.form));
+      var detailUrl = '#/vida/report-search/report-detail/' + i;
+      $rootScope.markers["report_" + i] = {
         draggable: false,
-        message: '<div><span style="padding-right: 5px;">' + shelter.name + '</span><a class="icon ion-chevron-right trigger" href=' + detailUrl + '></a></div>',
-        lat: coord.lat,
-        lng: coord.lng,
+        message: '<div><span style="padding-right: 5px;">' + form.schema.title + '</span><a class="icon ion-chevron-right trigger" href=' + detailUrl + '></a></div>',
+        lng: report.geom.coordinates[0],
+        lat: report.geom.coordinates[1],
         icon: {}
       };
     }
-  });
-})
+  };
 
-.controller('ShelterDetailCtrl', function ($scope, $state, $stateParams, shelterService, $rootScope) {
-  console.log("---- ShelterDetailCtrl. shelter id: ", $stateParams.shelterId, shelterService.getById($stateParams.shelterId));
-    $scope.shelter = shelterService.getById($stateParams.shelterId);
-    $scope.latlng = shelterService.getLatLng($stateParams.shelterId);
-
-    $rootScope.buttonBack = function() {
-      // Put edit/delete buttons back
-      var tabs = document.getElementsByClassName("tab-item");
-      for (var i=0; i < tabs.length; i++) {
-        tabs[i].setAttribute('style', 'display: none;');
-      }
-
-      var backButton = document.getElementsByClassName("button-person-back");
-      var editDeleteButtons = document.getElementsByClassName("button-person-edit");
-      for (i=0; i < editDeleteButtons.length; i++) {
-        editDeleteButtons[i].setAttribute('style', 'display: block;');    // Enables buttons
-      }
-      for (i=0; i < backButton.length; i++) {
-        backButton[i].setAttribute('style', 'display: none;');   // Remove button
-      }
-
-      window.history.back();
-    };
-
-    $scope.$on("$destroy", function(){
-      var backButton = document.getElementsByClassName("button-person-back");
-
-      for (i=0; i < backButton.length; i++) {
-        backButton[i].setAttribute('style', 'display: none;');   // Remove button
-      }
+  leafletDirective.getMap().then(function (thisMap) {
+    thisMap.eachLayer(function(layer){
+      MapLayer = layer;
     });
+    thisMap.setView({lat: 0, lon: 0}, 1);
+  });
 
-    $scope.buttonShelterHome = function() {
-      shelterService.getAll();
+  $scope.updateMarkers();
 
-      var tabs = document.getElementsByClassName("tab-item");
-      for (var i=0; i < tabs.length; i++) {
-        tabs[i].setAttribute('style', 'display: block;');
-      }
-
-      var backButton = document.getElementsByClassName("button-person-back");
-      var editDeleteButtons = document.getElementsByClassName("button-person-edit");
-      var saveCancelButtons = document.getElementsByClassName("button-person-post-edit");
-
-      for (i=0; i < saveCancelButtons.length; i++) {
-        saveCancelButtons[i].setAttribute('style', 'display: none;');  // remove buttons
-      }
-      for (i=0; i < editDeleteButtons.length; i++) {
-        editDeleteButtons[i].setAttribute('style', 'display: none;');    // remove buttons
-      }
-      for (i=0; i < backButton.length; i++) {
-        backButton[i].setAttribute('style', 'display: none;');   // Remove button
-      }
-
-      $state.go('vida.shelter-search');
-    };
 });
+
+
+

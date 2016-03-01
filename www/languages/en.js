@@ -15,6 +15,7 @@
     'title_picture_dialog': 'Picture',
     'login_username': 'Username',
     'login_password': 'Password',
+    'location': 'Location',
     'login_message': 'Log in with your Flintlock account',
     'dialog_confirm_cancel': 'Are you sure you want to cancel?',
     'dialog_confirm_delete': 'Are you sure you want to delete this person?',

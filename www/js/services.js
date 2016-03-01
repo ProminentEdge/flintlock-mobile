@@ -251,7 +251,7 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
 
     localDBService.removeValue('reports', report).then(function() {
       reports_ = reports_.filter(function(e) {
-        return angular.equals(e, report);
+        return !angular.equals(e, report);
       });
       deferred.resolve();
     }, function () {

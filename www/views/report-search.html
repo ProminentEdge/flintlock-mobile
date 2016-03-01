@@ -1,14 +1,18 @@
 <ion-view title="{{'title_reports' | translate}}">
   <ion-pane>
-    <ion-content padding="false" class="has-header">
+    <ion-content padding="false" scroll="false" class="has-header">
       <div class="item item-input-inset">
-        <label class="item-input-wrapper margin-right-8px" name="search-people">
+        <label class="item-input-wrapper margin-right-8px" name="search-reports">
           <i class="icon ion-search placeholder-icon"></i>
           <input type="search" id="searchText" ng-model="searchText" ng-model-options='{debounce: 700}' ng-change='searchPerson(searchText)'
                  style="" placeholder="{{'search_searchfield' | translate}}">
         </label>
+        <div>
+          <button class="button button-small button-stable button-block icon ion-map" ng-class="{'active': mapMode}" ng-click="mapMode = !mapMode"></button>
+        </div>
       </div>
-      <ion-list>
+
+      <ion-list ng-if="!mapMode">
         <div ng-repeat="report in reportService.get() track by $index">
           <ion-item class="item-thumbnail-left" href="#/vida/report-search/report-detail/{{$index}}">
             <img ng-if="reportService.hasMedia(report)" ng-src="{{reportService.getMediaFilePathByIndex(report, 0)}}"
@@ -18,6 +22,11 @@
           </ion-item>
         </div>
       </ion-list>
+
+      <div ng-if="mapMode" style="width: 100%; position: absolute; top: 60px; bottom: 0px;" data-tap-disabled="true">
+        <leaflet resizeable markers="markers" paths="paths" center="center" width="100%" height="100%" event-broadcast="events"></leaflet>
+      </div>
+
     </ion-content>
   </ion-pane>
 </ion-view>
