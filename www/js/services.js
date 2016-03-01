@@ -231,13 +231,29 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
     return deferred.promise;
   };
 
-  this.save = function(report) {
-    console.log('----[ save: ', report);
+  this.add = function(report) {
+    console.log('----[ reportService.add: ', report);
     var deferred = $q.defer();
 
     localDBService.insertValue('reports', report).then(function() {
       reports_.push(report);
       deferred.resolve(reports_);
+    }, function () {
+      deferred.reject();
+    });
+
+    return deferred.promise;
+  };
+
+  this.remove = function(report) {
+    console.log('----[ reportService.remove: ', report);
+    var deferred = $q.defer();
+
+    localDBService.removeValue('reports', report).then(function() {
+      reports_ = reports_.filter(function(e) {
+        return angular.equals(e, report);
+      });
+      deferred.resolve();
     }, function () {
       deferred.reject();
     });
@@ -1073,6 +1089,11 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
       }
     }, rejected);
     return deferred.promise;
+  };
+
+  this.removeValue = function(tableName, value) {
+    var key = utilService.getSHA1(value, true);
+    return service_.removeKey(tableName, key);
   };
 
   this.removeAllKeys = function(tableName) {

@@ -472,7 +472,7 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
   $scope.report = null;
   $scope.mediaPendingUploadMap = {};
   $scope.createNewReportMode = null;
-  $scope.reportOriginalHash = null;   // when in edit mode, get report's hash before it is canged
+  $scope.reportOriginal = null;
 
   // only when creating a new report, formId will be passed in
   if (typeof $stateParams.formId !== 'undefined') {
@@ -486,9 +486,11 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
     $scope.report = reportService.getNew(form);
     formService.setCurrentForm($stateParams.formId);
   } else {
-    $scope.report = reportService.get()[$stateParams.reportId];
+    $scope.reportOriginal = reportService.get()[$stateParams.reportId];
+    $scope.report = {};
+    // the copy of the report before we start to change it
+    angular.copy($scope.reportOriginal, $scope.report);
     formService.setCurrentForm(formService.uriToId($scope.report.form));
-    $scope.reportOriginalHash = utilService.getSHA1($scope.report, true);
   }
 
   // iOS:  store pics in temp folder needs to be moved to application folder
@@ -558,7 +560,7 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
         'type': 'Point'
       };
 
-      reportService.save($scope.report).then(function() {
+      reportService.add($scope.report).then(function() {
         //TODO: implement foreachWaitForCompletionAsync such that it can call setKey and pass all arguments to it
         var promises = [];
         for (var key in $scope.mediaPendingUploadMap) {
@@ -567,9 +569,22 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
         $q.all(promises).then(function() {
           $scope.mediaPendingUploadMap = {};
           $cordovaProgress.hide();
-          $rootScope.$broadcast('updateBadge');
-          utilService.notify("Report saved to local db");
-          $state.go('^');
+
+          var done = function() {
+            $rootScope.$broadcast('updateBadge');
+            utilService.notify("Report saved to local db");
+            $state.go('^');
+          };
+
+          if ($scope.createNewReportMode) {
+            done();
+          } else {
+            reportService.remove($scope.reportOriginal).then(function(){
+              done();
+            }, function() {
+              utilService.notify("failed remove older copy of the edited report");
+            });
+          }
         },
         function(){
           utilService.notify("failed to save media to local db: " + key);
