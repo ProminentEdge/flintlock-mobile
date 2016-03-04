@@ -523,6 +523,28 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
     });
   };
 
+  $scope.delete = function() {
+    console.log('----[ delete: ', $scope.report);
+
+    var options = {
+      title: 'Delete this report?',
+      buttonLabels: ['Yes', 'No'],
+      addCancelButtonWithLabel: $filter('translate')('modal_cancel'),
+      androidEnableCancelButton : true,
+      winphoneEnableCancelButton : true
+    };
+
+    $cordovaActionSheet.show(options).then(function(btnIndex) {
+      if (btnIndex === 1) {
+        $cordovaProgress.showSimpleWithLabelDetail(true, "Deleting", "Removing report");
+        reportService.remove($scope.report).then(function() {
+          $cordovaProgress.hide();
+          $state.go('^');
+        });
+      }
+    });
+  };
+
   $scope.showHint = function(msg) {
     console.log('----[ ', msg);
     $ionicLoading.show({
@@ -548,19 +570,18 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
       prevPicture = true;
     }
 
-    $cordovaActionSheet.show(options)
-      .then(function(btnIndex) {
-        if (prevPicture) {
-          if (btnIndex != 3) {
-            $scope.takeCameraPhoto_Personal(btnIndex);
-          } else {
-            //document.getElementById('personal_photo').src = peopleService.getPlaceholderImage();
-            $scope.hasPlaceholderImage = true;
-          }
-        } else {
+    $cordovaActionSheet.show(options).then(function(btnIndex) {
+      if (prevPicture) {
+        if (btnIndex != 3) {
           $scope.takeCameraPhoto_Personal(btnIndex);
+        } else {
+          //document.getElementById('personal_photo').src = peopleService.getPlaceholderImage();
+          $scope.hasPlaceholderImage = true;
         }
-      });
+      } else {
+        $scope.takeCameraPhoto_Personal(btnIndex);
+      }
+    });
   };
 
   $scope.takeCameraPhoto_Personal = function(source) {

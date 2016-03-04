@@ -421,6 +421,107 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
   };
 })
 
+.service('mapService', function($rootScope, reportService, formService, leafletData, olData) {
+  var service_ = this;
+  var markers_ = [
+    {
+      name: 'London',
+      lat: 51.505,
+      lon: -0.09,
+      label: {
+        message: '<h2> youoislkn </h2>>',
+        show: true,
+        showOnMouseOver: true
+      }
+    },
+    {
+      name: 'Bath',
+      lat: 51.375,
+      lon: -2.35,
+      label: {
+        message: 'jojo',
+        show: true,
+        showOnMouseOver: true
+      }
+    },
+    {
+      name: 'Canterbury',
+      lat: 51.267,
+      lon: 1.083,
+      label: {
+        message: 'yoyo',
+        show: true,
+        showOnMouseOver: true
+      }
+
+    }
+  ];
+
+  this.get = function() {
+    return markers_;
+  };
+
+  this.updateMarkersOld = function() {
+    // clear the markers object without recreating it
+    for (var variableKey in markers_) {
+      if (markers_.hasOwnProperty(variableKey)) {
+        delete markers_[variableKey];
+      }
+    }
+
+    var reports = reportService.get();
+    for (var i = 0; i < reports.length; i++) {
+      var report = reports[i];
+      var form = formService.getById(formService.uriToId(report.form));
+      var detailUrl = '#/vida/report-search/report-detail/' + i;
+      markers_["report_" + i] = {
+        draggable: false,
+        message: form.schema.title,
+        lng: report.geom.coordinates[0],
+        lat: report.geom.coordinates[1],
+        icon: {}
+      };
+
+      //<a class="icon ion-chevron-right trigger" href=' + detailUrl + '>
+    }
+  };
+
+  this.setView = function(lat, lon, zoom) {
+    leafletData.getMap().then(function (map) {
+      map.setView({lat: lat, lon: lon}, zoom);
+    });
+  };
+
+  olData.getMap().then(function(map) {
+    console.log('---- olData ----');
+    var layers = map.on('click', function(evt) {
+      console.log('map.on click: ', evt);
+    });
+  }, function(a, b){
+    console.log('==== errr gettign map');
+  });
+
+/*
+  map.on('click', function(evt) {
+    var element = popup.getElement();
+    var coordinate = evt.coordinate;
+    var hdms = ol.coordinate.toStringHDMS(ol.proj.transform(
+      coordinate, 'EPSG:3857', 'EPSG:4326'));
+
+    $(element).popover('destroy');
+    popup.setPosition(coordinate);
+    // the keys are quoted to prevent renaming in ADVANCED mode.
+    $(element).popover({
+      'placement': 'top',
+      'animation': false,
+      'html': true,
+      'content': '<p>The location you clicked was:</p><code>' + hdms + '</code>'
+    });
+    $(element).popover('show');
+  });
+*/
+
+})
 
 .factory('geolocationService', function ($q, $timeout, utilService) {
   // if call has been made in the past 1 second, don't hit the api
@@ -698,70 +799,6 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
       return 'photos';
     if ('Photos' in form.schema.properties)
       return 'Photos';
-  };
-})
-
-.service('shelterService', function($http, configService, $resource, $q) {
-  var service = this;
-  var shelters = [];
-  var current_shelter = {};
-  current_shelter.str = 'None';
-  current_shelter.link = 'None';
-
-  this.getAll = function() {
-    var shelter = $resource(configService.getShelterURL() + ':id', {}, {
-      query: {
-        method: 'GET',
-        isArray: true,
-        transformResponse: $http.defaults.transformResponse.concat([
-          function (data, headersGetter) {
-            shelters = data.objects;
-            console.log('----[ transformResponse data: ', data);
-            return data.objects;
-          }
-        ])
-      }
-    });
-
-    return shelter.query().$promise;
-  };
-
-  this.getById = function(id) {
-    for(var i = 0; i < shelters.length; i++) {
-      if (shelters[i].id == id)
-        return shelters[i];
-    }
-  };
-
-  this.getCurrentShelter = function() {
-    return current_shelter;
-  };
-
-  this.setCurrentShelter = function(shelter){
-    if (shelter !== 'None') {
-      current_shelter.str = shelter.name;
-      current_shelter.link = '#/vida/shelter-search/shelter-detail/' + shelter.id;
-    } else {
-      current_shelter.str = 'None';
-      current_shelter.link = 'None';
-    }
-  };
-
-  this.getLatLng = function(id) {
-    var shelter = service.getById(id);
-    // look for 'point' in wkt and get the pair of numbers in the string after it
-    var trimParens = /^\s*\(?(.*?)\)?\s*$/;
-    var coordinateString = shelter.geom.toLowerCase().split('point')[1].replace(trimParens, '$1').trim();
-    var tokens = coordinateString.split(' ');
-    var lng = parseFloat(tokens[0]);
-    var lat = parseFloat(tokens[1]);
-    return {lat: lat, lng: lng};
-  };
-
-  this.printToConsole = function() {
-    for (var i = 0; i < peopleInShelter.length; i++) {
-      console.log(peopleInShelter[i].given_name);
-    }
   };
 })
 
