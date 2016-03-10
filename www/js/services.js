@@ -421,9 +421,93 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
   };
 })
 
-.service('mapService', function($rootScope, reportService, formService, leafletData, olData) {
+.service('mapService', function($rootScope, reportService, formService, utilService, $cordovaSQLite, $ionicPlatform,
+                                leafletData, leafletMapDefaults) {
   var service_ = this;
-  var markers_ = [
+  var markers_ = {};
+  var mbtilesDB_ = null;
+  var layer_ = {};
+  //var leafletDirective = angular.element(document.body).injector().get('leafletData');
+
+
+  this.openMBTilesDB = function(){
+    $ionicPlatform.ready(function() {
+      mbtilesDB_ = $cordovaSQLite.openDB('osm.mbtiles');
+      mbtilesDB_.transaction(function(tx){
+        tx.executeSql("SELECT * FROM tiles WHERE zoom_level=? AND tile_column=? AND tile_row=?;", [0, 0, 0],
+          function (tx, res) {
+            console.log("====[ res.rows.length: ", res.rows.length);
+            if (res.rows.length > 0) {
+              console.log("====[ yoyo!");
+              console.log("=====Found data row 0: ", res.rows.item(0));
+            }
+          }, function (er) {
+            console.log('error with executeSql', er);
+          });
+      });
+    });
+  };
+
+  this.get = function() {
+    return markers_;
+  };
+
+  this.updateMarkers = function() {
+    // clear the markers object without recreating it
+    for (var variableKey in markers_) {
+      if (markers_.hasOwnProperty(variableKey)) {
+        delete markers_[variableKey];
+      }
+    }
+
+    var reports = reportService.get();
+    for (var i = 0; i < reports.length; i++) {
+      var report = reports[i];
+      var form = formService.getById(formService.uriToId(report.form));
+      var detailUrl = '#/vida/report-search/report-detail/' + i;
+      markers_["report_" + i] = {
+        draggable: false,
+        message: '<a class="trigger" href=' + detailUrl + '>' + form.schema.title + '</a>',
+        lng: report.geom.coordinates[0],
+        lat: report.geom.coordinates[1],
+        icon: {}
+      };
+    }
+  };
+
+
+  this.setView = function(lat, lon, zoom) {
+    leafletData.getMap().then(function (map) {
+      map.setView({lat: lat, lon: lon}, zoom);
+    });
+  };
+
+  this.updateBasemap = function() {
+    leafletData.getMap().then(function (map) {
+      // Remove previous layer (Connected Layer or Disconnected Layer)
+      map.removeLayer(layer_);
+
+      // Add new layer to the map
+      if (utilService.isConnected()) {
+        // Connected Map
+        service_.updateMarkers();
+        // Add URL based layer to map
+        //var leafletMapDefaults = angular.element(document.body).injector().get('leafletMapDefaults');
+        var defaults = leafletMapDefaults.getDefaults();
+        layer_ = L.tileLayer(defaults.tileLayer, defaults.tileLayerOptions).addTo(map);
+      } else {
+        // Disconnected Map
+        var mapOptions = {maxZoom: 16, attribution: 'Offline Map', tms: true};
+        layer_ = new L.TileLayer.MBTiles('', mapOptions, mbtilesDB_).addTo(map);
+      }
+    });
+  };
+
+  service_.updateBasemap();
+  service_.updateMarkers();
+
+  /*
+  var olMarkers_ = [
     {
       name: 'London',
       lat: 51.505,
@@ -457,41 +541,6 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
     }
   ];
 
-  this.get = function() {
-    return markers_;
-  };
-
-  this.updateMarkersOld = function() {
-    // clear the markers object without recreating it
-    for (var variableKey in markers_) {
-      if (markers_.hasOwnProperty(variableKey)) {
-        delete markers_[variableKey];
-      }
-    }
-
-    var reports = reportService.get();
-    for (var i = 0; i < reports.length; i++) {
-      var report = reports[i];
-      var form = formService.getById(formService.uriToId(report.form));
-      var detailUrl = '#/vida/report-search/report-detail/' + i;
-      markers_["report_" + i] = {
-        draggable: false,
-        message: form.schema.title,
-        lng: report.geom.coordinates[0],
-        lat: report.geom.coordinates[1],
-        icon: {}
-      };
-
-      //<a class="icon ion-chevron-right trigger" href=' + detailUrl + '>
-    }
-  };
-
-  this.setView = function(lat, lon, zoom) {
-    leafletData.getMap().then(function (map) {
-      map.setView({lat: lat, lon: lon}, zoom);
-    });
-  };
-
   olData.getMap().then(function(map) {
     console.log('---- olData ----');
     var layers = map.on('click', function(evt) {
@@ -500,26 +549,26 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
   }, function(a, b){
     console.log('==== errr gettign map');
   });
+  */
+  /*
+    map.on('click', function(evt) {
+      var element = popup.getElement();
+      var coordinate = evt.coordinate;
+      var hdms = ol.coordinate.toStringHDMS(ol.proj.transform(
+        coordinate, 'EPSG:3857', 'EPSG:4326'));
 
-/*
-  map.on('click', function(evt) {
-    var element = popup.getElement();
-    var coordinate = evt.coordinate;
-    var hdms = ol.coordinate.toStringHDMS(ol.proj.transform(
-      coordinate, 'EPSG:3857', 'EPSG:4326'));
-
-    $(element).popover('destroy');
-    popup.setPosition(coordinate);
-    // the keys are quoted to prevent renaming in ADVANCED mode.
-    $(element).popover({
-      'placement': 'top',
-      'animation': false,
-      'html': true,
-      'content': '<p>The location you clicked was:</p><code>' + hdms + '</code>'
+      $(element).popover('destroy');
+      popup.setPosition(coordinate);
+      // the keys are quoted to prevent renaming in ADVANCED mode.
+      $(element).popover({
+        'placement': 'top',
+        'animation': false,
+        'html': true,
+        'content': '<p>The location you clicked was:</p><code>' + hdms + '</code>'
+      });
+      $(element).popover('show');
     });
-    $(element).popover('show');
-  });
-*/
+  */
 
 })
 

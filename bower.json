@@ -7,7 +7,9 @@
   },
   "dependencies": {
     "angularjs-toaster": "~0.4.14",
-    "leaflet": "~0.7.3",
+    "leaflet": "~0.7.7",
+    "ui-leaflet": "~1.0.0",
+    "angular-openlayers-directive": "~1.9.2",
     "ngCordova": "~0.1.20-alpha",
     "angular-translate": "2.8.1",
     "angular-resource": "1.4.3",

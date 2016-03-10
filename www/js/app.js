@@ -7,11 +7,12 @@
 // 'vida.controllers' is found in controllers.js
 // 'vida.services' is found in services.js
 var db = null;
-angular.module('vida', ['ionic', 'ngCordova', 'vida.directives', 'vida.controllers', 'vida.services', 'leaflet-directive',
-    'pascalprecht.translate', 'vida-translations-en', 'vida-translations-es', 'ngResource', 'angularMoment', 'ngCordovaOauth'])
+angular.module('vida', ['ionic', 'ngCordova', 'vida.directives', 'vida.controllers', 'vida.services', 'nemLogging',
+  'ui-leaflet', /*'openlayers-directive',*/ 'pascalprecht.translate', 'vida-translations-en', 'vida-translations-es',
+  'ngResource', 'angularMoment', 'ngCordovaOauth'])
 
 .run(function($q, $ionicPlatform, $window, $cordovaSQLite, configService, localDBService, $cordovaToast, formService,
-              $rootScope, reportService) {
+              $rootScope, reportService, mapService) {
   $ionicPlatform.ready(function() {
     // Hide the accessory bar by default (remove this to show the accessory bar above the keyboard
     // for form inputs).
@@ -42,6 +43,7 @@ angular.module('vida', ['ionic', 'ngCordova', 'vida.directives', 'vida.controlle
 
         // open the local database and load the settings
         localDBService.openLocalDB();
+        mapService.openMBTilesDB();
 
         var promises = [];
         // create the tables needed by the app if not already in the db

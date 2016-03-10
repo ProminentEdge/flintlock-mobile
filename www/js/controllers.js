@@ -1,7 +1,7 @@
 angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.translate'])
 
 
-.controller('AppCtrl', function($rootScope, $scope, $ionicModal, $timeout, shelterService, $translate, configService) {
+.controller('AppCtrl', function($rootScope, $scope, $ionicModal, $timeout, $translate, configService) {
   console.log('---------------------------------- AppCtrl');
   $translate.instant("title_search");
   console.log('---------------------------------- translate: ', $translate.instant("title_search"));
@@ -29,20 +29,11 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
     console.log('$stateNotFound '+unfoundState.to+'  - fired when a state cannot be found by its name.');
     console.log(unfoundState, fromState, fromParams);
   });
-
-  $rootScope.center = {
-    lat: 0,
-    lng: 0,
-    zoom: 0
-  };
-
-  $rootScope.markers = {};
-
 })
 
 .controller('SettingsCtrl', function($scope, $location, configService, $translate, $cordovaOauth, $ionicPopup,
                                      localDBService, $rootScope, $cordovaToast, $cordovaInAppBrowser, loginService,
-                                     $http, $state, reportService, utilService, mediaService){
+                                     $http, $state, reportService, utilService, mediaService, mapService){
   console.log('---------------------------------- SettingsCtrl');
 
   $scope.configService = configService;
@@ -149,6 +140,10 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
     });
 
     console.log('current config: ', configService.getConfig());
+  };
+
+  $scope.updateBasemap = function() {
+    mapService.updateBasemap();
   };
 
   $scope.pushMedia = function() {
@@ -604,47 +599,62 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
   };
 })
 
-.controller('ReportSearchCtrl', function($scope, $rootScope, reportService, formService){
+.controller('ReportSearchCtrl', function($scope, $rootScope, reportService, formService, mapService, leafletMapEvents, leafletMarkerEvents){
   console.log("---- ReportSearchCtrl");
   $scope.reportService = reportService;
   $scope.formService = formService;
-  $scope.mapMode = false;
-  
-  var MapLayer = {};
-  var leafletDirective = angular.element(document.body).injector().get('leafletData');
+  $scope.mapMode = true;
 
-  $scope.updateMarkers = function() {
-    // clear the markers object without recreating it
-    for (var variableKey in $rootScope.markers) {
-      if ($rootScope.markers.hasOwnProperty(variableKey)) {
-        delete $rootScope.markers[variableKey];
-      }
-    }
+  $scope.markers = mapService.get();
+  $scope.center = {
+    lat: 30,
+    lng: -100,
+    zoom: 3
+  };
 
-    var reports = reportService.get();
-    for (var i = 0; i < reports.length; i++) {
-      var report = reports[i];
-      var form = formService.getById(formService.uriToId(report.form));
-      var detailUrl = '#/vida/report-search/report-detail/' + i;
-      $rootScope.markers["report_" + i] = {
-        draggable: false,
-        message: '<div><span style="padding-right: 5px;">' + form.schema.title + '</span><a class="icon ion-chevron-right trigger" href=' + detailUrl + '></a></div>',
-        lng: report.geom.coordinates[0],
-        lat: report.geom.coordinates[1],
-        icon: {}
-      };
+  $scope.toggleMode = function() {
+    $scope.mapMode = !$scope.mapMode;
+    mapService.updateMarkers();
+  };
+
+  $scope.events = {
+    path: {
+      enable: [ 'click', 'mouseover' ],
+      logic: 'emit'
+    },
+    map: {
+      enable: leafletMapEvents.getAvailableMapEvents(),
+      logic: 'emit'
+    },
+    markers: {
+      enable: leafletMarkerEvents.getAvailableEvents(),
+      logic: 'emit'
     }
   };
 
-  leafletDirective.getMap().then(function (thisMap) {
-    thisMap.eachLayer(function(layer){
-      MapLayer = layer;
+
+  var mapEvents = leafletMapEvents.getAvailableMapEvents();
+  console.log('mapEvents: ', mapEvents);
+  for (var k in mapEvents){
+    var eventName = 'leafletDirectiveMap.' + mapEvents[k];
+    $scope.$on(eventName, function(event){
+      console.log('---- ', event.name);
     });
-    thisMap.setView({lat: 0, lon: 0}, 1);
+  }
+
+  $scope.$on("leafletDirectiveMap.click", function(event, args){
+    console.log('====================================== chk1');
   });
 
-  $scope.updateMarkers();
 
+  //$scope.$on("leafletDirectiveMarker.dragend", function(event, args){
+  //  console.log('hola');
+  //  $scope.markers.m1.lat = args.model.lat;
+  //  $scope.markers.m1.lng = args.model.lng;
+  //});
+
+
+  //mapService.setView(-50, 20, 10);
 });
 
 

@@ -1,4 +1,4 @@
-<ion-view title="{{'title_reports' | translate}}">
+<ion-view title="{{'title_reports' | translate}}" data-tap-disabled="true">
   <ion-pane>
     <ion-content padding="false" scroll="false" class="has-header">
       <div class="item item-input-inset">
@@ -8,11 +8,11 @@
                  style="" placeholder="{{'search_searchfield' | translate}}">
         </label>
         <div>
-          <button class="button button-small button-stable button-block icon ion-map" ng-class="{'active': mapMode}" ng-click="mapMode = !mapMode"></button>
+          <button class="button button-small button-stable button-block icon ion-map" ng-class="{'active': mapMode}" ng-click="toggleMode()"></button>
         </div>
       </div>
 
-      <ion-list ng-if="!mapMode">
+      <ion-list ng-show="!mapMode">
         <div ng-repeat="report in reportService.get() track by $index">
           <ion-item class="item-thumbnail-left" href="#/vida/report-search/report-detail/{{$index}}">
             <img ng-if="reportService.hasMedia(report)" ng-src="{{reportService.getMediaFilePathByIndex(report, 0)}}"
@@ -23,9 +23,30 @@
         </div>
       </ion-list>
 
-      <div ng-if="mapMode" style="width: 100%; position: absolute; top: 60px; bottom: 0px;" data-tap-disabled="true">
-        <leaflet resizeable markers="markers" paths="paths" center="center" width="100%" height="100%" event-broadcast="events"></leaflet>
+      <!--
+      There is a problem with popups not always functioning. if there is an ng-if or ng-show on the div containing the map,
+      seems to happen even more easily. not angular or ol3 related and def ionic touch related. data-tap-disabled="true"
+      solves the problem wbut it is as if it flibs to false essentially at somepoint. loading mapmarkers again sometiems
+       fixes the problem. When data-tap-disabled="true" (added to root controller/app) the popup comes up and closes
+       slightly faster and seems to work from there on. when it starts to close slower, then it breaks as if the double tap
+       stuff is enabled and cauing problem.
+      -->
+      <div ng-show="mapMode" style="touch-events: none; width: 100%; position: absolute; top: 60px; bottom: 0px;" data-tap-disabled="true">
+        <leaflet id="map" markers="markers" event-broadcast="events" center="center" width="100%" height="100%"></leaflet>
       </div>
+      <!--
+      <div  style="width: 100%; position: absolute; top: 60px; bottom: 0px;" data-tap-disabled="true">
+        <openlayers id="map"  ol-markers="markers" height="100%" width="100%">
+          <ol-marker ng-repeat="marker in markers" lat="marker.lat" lon="marker.lon"></ol-marker>
+        </openlayers>
+      </div>
+
+      <div style="display: none;">
+        <a class="overlay" id="vienna" target="_blank" href="http://en.wikipedia.org/wiki/Vienna">Vienna</a>
+        <div id="marker" title="Marker"></div>
+        <div id="popup" title="Welcome to ol3"></div>
+      </div>
+      -->
 
     </ion-content>
   </ion-pane>
