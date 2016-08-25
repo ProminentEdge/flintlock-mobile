@@ -432,7 +432,7 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
 
   this.openMBTilesDB = function(){
     $ionicPlatform.ready(function() {
-      mbtilesDB_ = $cordovaSQLite.openDB('osm.mbtiles');
+      mbtilesDB_ = $cordovaSQLite.openDB({name: 'osm.mbtiles', location: 'default'});
       mbtilesDB_.transaction(function(tx){
         tx.executeSql("SELECT * FROM tiles WHERE zoom_level=? AND tile_column=? AND tile_row=?;", [0, 0, 0],
           function (tx, res) {
