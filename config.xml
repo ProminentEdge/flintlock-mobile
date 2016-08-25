@@ -3,10 +3,10 @@
   <name>Flintlock</name>
   <description>
         Application for creating reports and also tracking devices.
-    </description>
+  </description>
   <author email="contact@prominentedge.com" href="http://prominentedge.com/">
       Prominent Edge Team
-    </author>
+  </author>
   <content src="index.html"/>
   <access origin="*"/>
   <allow-intent href="http://*/*"/>

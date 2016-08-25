@@ -1036,7 +1036,7 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
 
   this.openLocalDB = function(){
     $ionicPlatform.ready(function() {
-      localDB_ = $cordovaSQLite.openDB('localDB.sqlite');
+      localDB_ = $cordovaSQLite.openDB({name: 'localDB.sqlite', location: 'default'});
     });
   };
 
