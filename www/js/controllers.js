@@ -69,6 +69,7 @@ angular.module('vida.controllers', ['ngCordova.plugins.camera', 'pascalprecht.tr
   };
 
   $scope.deauthorize = function() {
+    console.log('----[ deauthorize');
     configService.resetAuthorizationConfig();
     configService.saveConfig().then(function(){
       $state.go('vida.report-create');

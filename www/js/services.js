@@ -901,9 +901,8 @@ angular.module('vida.services', ['ngCordova', 'ngResource'])
   };
 
   this.saveConfig = function() {
-    localDBService.setKey('properties', 'config', config_).then(function(){
-      console.log('saved config: ', config_);
-    });
+    console.log('----[ saveConfig, will save config: ', config_);
+    return localDBService.setKey('properties', 'config', config_);
   };
 
   this.isReady = function() {
